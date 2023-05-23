@@ -3,7 +3,6 @@
  * @version  V1.00
  * @brief    Key store register definition header file
  *
- * @copyright SPDX-License-Identifier: Apache-2.0
  * @copyright (C) 2018 Nuvoton Technology Corp. All rights reserved.
  *****************************************************************************/
 #ifndef __KEYSTORE_REG_H__

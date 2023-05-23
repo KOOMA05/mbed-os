@@ -20,6 +20,7 @@
 #include "gpio_api.h"
 #include "pinmap.h"
 #include "mbed_error.h"
+#include "partition_M2354.h"
 
 #if DEVICE_PORTIN || DEVICE_PORTOUT || DEVICE_PORTINOUT
 

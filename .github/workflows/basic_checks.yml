@@ -1,39 +1,34 @@
 # This workflow performs the checks like license check,
 # doxygen, unit tests etc.
+
 name: Basic Checks
 
 on:
   pull_request:
-  workflow_dispatch:
   push:
     branches:
-      - master
+      - mbed-os-5.15
 
 jobs:
+
   license-check:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/armmbed/mbed-os-env:master-latest
+      image: ghcr.io/armmbed/mbed-os-env:mbed-os-5.15-latest
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          
 
-      - 
-        name: install dependencies
-        shell: bash
-        run: |
-          pip install -U scancode-toolkit "click>=7,<8"
-
-      - 
-        name: license check 
+      -
+        name: license check
         run: |
           set -x
           mkdir -p SCANCODE
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
           git diff --name-only --diff-filter=d origin/${GITHUB_BASE_REF} \
             | ( grep '.\(c\|cpp\|h\|hpp\|py\)$' || true )
           echo $?
@@ -42,8 +37,8 @@ jobs:
             | ( grep -v '^tools/test/toolchains/api_test.py' || true ) \
             | while read file; do cp --parents "${file}" SCANCODE; done
           ls SCANCODE
-          scancode --reindex-licenses # workaround for https://github.com/nexB/scancode-toolkit/issues/3179
           scancode -l --json-pp scancode.json SCANCODE
+
           python ./tools/test/ci/scancode-evaluate.py scancode.json || true
           cat scancode-evaluate.log
           COUNT=$(cat scancode-evaluate.log | grep 'File:' | grep -v 'SPDX' | wc -l) || true
@@ -58,83 +53,41 @@ jobs:
   include-check:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/armmbed/mbed-os-env:master-latest
+      image: ghcr.io/armmbed/mbed-os-env:mbed-os-5.15-latest
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
-      - 
-        name: include check
+      -
+        name: "include check"
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          # checks mbed.h is not included in MbedOS files except in tests
           ! git grep '^#include\s["'"']mbed.h['"'"]$' -- '*.c' '*.h' '*.cpp' '*.hpp' \
               ':!*platform_mbed.h' ':!*TESTS/*' ':!TEST_APPS/' ':!UNITTESTS/' \
-              ':!*tests/*' ':!*targets/*' ':!*TARGET_*' ':!*unsupported/*' \
-              ':!*events/tests/*' ':!*drivers/tests/*'
-
-  style-check:
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/armmbed/mbed-os-env:master-latest
-
-    steps:
-
-      - name: Checkout repo
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-    
-      - 
-        name: UTF-8 Check
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          # Make sure we're not introducing any text which is not UTF-8 encoded
-          git diff origin/${GITHUB_BASE_REF} -U0 | ( grep -a '^+' || true ) | ( ! grep -axv '.*' )
-          
-
-      - 
-        name: astyle checks
-        run: |
-          set -x
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          git diff --name-only --diff-filter=d origin/${GITHUB_BASE_REF} \
-            | ( grep '.*\.\(c\|cpp\|h\|hpp\)$' || true ) \
-            | ( grep -v -f .codecheckignore || true ) \
-            | while read file; do astyle -n --options=.astylerc "${file}"; done
-          git diff --exit-code --diff-filter=d --color
-
+              ':!*tests/*' ':!*targets/*' ':!*TARGET_*' ':!*unsupported/*'
 
   docs-check:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/armmbed/mbed-os-env:master-latest
+      image: ghcr.io/armmbed/mbed-os-env:mbed-os-5.15-latest
 
     steps:
-
       - name: Checkout repo
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-    
-      - 
+
+      -
         name: spell checks
         run: |
-          set -x
-          ./tools/test/ci/doxy-spellchecker/spell.sh drivers .codecheckignore
-          ./tools/test/ci/doxy-spellchecker/spell.sh platform .codecheckignore
-          ./tools/test/ci/doxy-spellchecker/spell.sh events .codecheckignore
-          ./tools/test/ci/doxy-spellchecker/spell.sh rtos .codecheckignore
-          ./tools/test/ci/doxy-spellchecker/spell.sh connectivity/netsocket .codecheckignore
+          ./tools/test/ci/doxy-spellchecker/spell.sh drivers
+          ./tools/test/ci/doxy-spellchecker/spell.sh platform
+          ./tools/test/ci/doxy-spellchecker/spell.sh events
+          ./tools/test/ci/doxy-spellchecker/spell.sh rtos
+          ./tools/test/ci/doxy-spellchecker/spell.sh connectivity/netsocket
 
-      - 
+      -
         name: doxygen
         run: |
-          set -x
-          ccache -s
           mkdir BUILD
           # Assert that the Doxygen build produced no warnings.
           # The strange command below asserts that the Doxygen command had an
@@ -154,9 +107,43 @@ jobs:
           find  -name "*.s" | tee BUILD/badasm |
           sed -e "s/^/Bad Assembler file name found: /" && [ ! -s BUILD/badasm ]
 
+
+  style-check:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/armmbed/mbed-os-env:mbed-os-5.15-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      -
+        name: astyle checks
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git diff --name-only --diff-filter=d origin/${GITHUB_BASE_REF} \
+            | ( grep '.*\.\(c\|cpp\|h\|hpp\)$' || true ) \
+            | ( grep -v -f .astyleignore || true ) \
+            | while read file; do astyle -n --options=.astylerc "${file}"; done
+          git diff --exit-code --diff-filter=d --color
+
+      -
+        name: "UTF-8 Check"
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          # Make sure we're not introducing any text which is not UTF-8 encoded
+          git diff origin/${GITHUB_BASE_REF} -U0 | ( grep -a '^+' || true ) | ( ! grep -axv '.*' )
+
+
   python-tests:
     # these tests run in 3.7, hence running in vm not in pre-built docker
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ '3.7' ]
+
     steps:
       -
         name: Checkout repo
@@ -165,28 +152,29 @@ jobs:
 
       - uses: actions/setup-python@v2
         with:
-          python-version: '3.7'
+          python-version: ${{ matrix.python-version }}
 
       -
         name: install dependencies
         run: |
-          pip install -r requirements.txt 
-          pip install mock==2.0.0 attrs==19.1.0 pytest==3.3.0 'pylint>=1.9,<2' 'hypothesis>=3,<4' 'coverage>=4.5,<5'
-
+          pip install -r requirements.txt
+          pip install mock==2.0.0 attrs==19.1.0 pytest==3.3.0 'pylint>=1.9,<2' 'hypothesis>=3,<4' 'coverage>=4.5,<5' MarkupSafe==2.0.1
       -
         name: pytest
         run: |
-          set -x
+          # PYTHONPATH=.
           coverage run -a -m pytest tools/test
           python tools/test/pylint.py
           coverage run -a tools/project.py -S | sed -n '/^Total/p'
           coverage html
 
-  pin-validation:
+  events-library:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/armmbed/mbed-os-env:master-latest
+      image: ghcr.io/armmbed/mbed-os-env:mbed-os-5.15-latest
+
     steps:
+
       -
         name: Checkout repo
         uses: actions/checkout@v3
@@ -194,83 +182,19 @@ jobs:
           fetch-depth: 0
 
       -
-        name: validate pins
+        name: run test
+        shell: bash
         run: |
-          set -x
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          git diff --name-only --diff-filter=d origin/${GITHUB_BASE_REF} \
-            | ( grep '.*[\\|\/]PinNames.h$' || true ) \
-            | while read file; do python ./hal/tests/pinvalidate/pinvalidate.py -vvvfp "${file}"; done
-          git diff --exit-code --diff-filter=d --color
-
-  cmake-checks:
-    env: 
-      NAME: mbed-test-mode-check 
-      ROOT: tools/cmake/tests/mbed_test_mode/ 
-      TOOLCHAIN: GCC_ARM 
-      TARGET_NAME: K64F 
-      PROFILE: develop
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/armmbed/mbed-os-env:master-latest
-    steps:
-      -
-        name: Checkout repo
-        uses: actions/checkout@v3
-
-      -
-        name: cmake build
-        run: |
-          set -x
-          mbedtools configure -p ${{ env.ROOT}} -t ${{ env.TOOLCHAIN }} -m ${{ env.TARGET_NAME }} --mbed-os-path .
-          cmake -S ${{env.ROOT}} -B ${{ env.ROOT }}/cmake_build/${{env.TARGET_NAME}}/${{ env.PROFILE }}/${{ env.TOOLCHAIN }}/ -GNinja -DCMAKE_BUILD_TYPE=${{ env.PROFILE }}
-          cmake --build ${{ env.ROOT }}/cmake_build/${{ env.TARGET_NAME }}/${{ env.PROFILE }}/${{ env.TOOLCHAIN }}/
-
-      -
-        name: cmake unittest
-        run: |
-          set -x     
-          ctest --build-and-test . build --build-generator Ninja --build-options -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug -DCOVERAGE=ON --test-command ctest        
-          gcovr --gcov-executable gcov -r . ./build -s -e ".*\.h" --exclude-directories=${GITHUB_WORKSPACE}/build/UNITTESTS --exclude-directories=${GITHUB_WORKSPACE}/build/_deps
-          ccache -s
-
-  # Reject any changes to tools that would require a re-release of the
-  # tools for the online compiler.
-  frozen-tools-check:
-      runs-on: ubuntu-latest
-      container:
-        image: ghcr.io/armmbed/mbed-os-env:master-latest
-      steps:
-        -
-          name: Checkout repo
-          uses: actions/checkout@v3
-          with:
-            fetch-depth: 0
-
-        -
-          name: frozen tool check
-          run: |
-              set -x
-              git config --global --add safe.directory "$GITHUB_WORKSPACE"
-              git diff --name-only origin/${GITHUB_BASE_REF} \
-                      | egrep \
-                        -e "^tools/build_api*" \
-                        -e "^tools/config*" \
-                        -e "^tools/export*" \
-                        -e "^tools/notifier*" \
-                        -e "^tools/paths*" \
-                        -e "^tools/resources*" \
-                        -e "^tools/targets*" \
-                        -e "^tools/toolchains*" \
-                        -e "^tools/utils*" \
-                        -e "^$" > output.log | true
-              frozen_files=`cat output.log`
-
-              if [ -z "$frozen_files" ]; then
-                  echo "Success!";
-              else
-                  echo -e "Failure: Frozen files were modified\n$frozen_files";
-                  echo -e "Please see https://os.mbed.com/blog/entry/Introducing-the-new-Mbed-Tools/" \
-                          "\nfor why we've frozen the legacy tools.";
-                  false;
-              fi
+          # Check that example compiles
+          sed -n '/``` cpp/,/```/{/```$/Q;/```/d;p;}' events/README.md > main.cpp
+          python tools/make.py -t GCC_ARM -m K64F --source=. --build=BUILD/K64F/GCC_ARM -j0
+          # Check that example compiles without rtos
+          sed -n '/``` cpp/,/```/{/```$/Q;/```/d;p;}' events/README.md > main.cpp
+          rm -r rtos drivers/source/usb features/cellular features/netsocket features/nanostack \
+              features/lwipstack features/frameworks/greentea-client \
+              features/frameworks/utest features/frameworks/unity components BUILD
+          python tools/make.py -t GCC_ARM -m DISCO_F401VC --source=. --build=BUILD/DISCO_F401VC/GCC_ARM -j0
+          # Run local equeue tests
+          make -C events/source test
+          # Run profiling tests
+          make -C events/source prof | tee prof

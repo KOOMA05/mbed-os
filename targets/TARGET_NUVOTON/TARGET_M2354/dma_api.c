@@ -25,6 +25,7 @@
 #include "nu_modutil.h"
 #include "nu_bitutil.h"
 #include "dma.h"
+#include "partition_M2354.h"
 
 #define NU_PDMA_CH_MAX      PDMA_CH_MAX     /* Specify maximum channels of PDMA */
 #define NU_PDMA_CH_Pos      0               /* Specify first channel number of PDMA */
@@ -45,13 +46,20 @@ struct nu_dma_chn_s {
  * 2. In secure domain, only PDMA0 is accessible and shall be used for secure peripheral.
  * 3. In non-secure domain, only PDMA1 is accessible and shall be used for non-secure peripheral.
  */
+#if (! defined(SCU_INIT_PNSSET0_VAL)) || (! (SCU_INIT_PNSSET0_VAL & (1 << 24)))
+#error("PDMA1 must be configured to non-secure for non-secure peripherals.")
+#endif
 
 static int dma_inited = 0;
 static uint32_t dma_chn_mask = 0;
 static struct nu_dma_chn_s dma_chn_arr[NU_PDMA_CH_MAX];
 
 static void pdma_vec(void);
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3L)
+static const struct nu_modinit_s dma_modinit = {DMA_0, PDMA0_MODULE, 0, 0, PDMA0_RST, PDMA0_IRQn, (void *) pdma_vec};
+#else
 static const struct nu_modinit_s dma_modinit = {DMA_1, PDMA1_MODULE, 0, 0, PDMA1_RST, PDMA1_IRQn, (void *) pdma_vec};
+#endif
 
 void dma_init(void)
 {
@@ -77,9 +85,15 @@ void dma_init(void)
 
     /* Check security state of PDMA0/1 match the partition policy above. */
     PDMA_T *pdma_base = dma_modbase();
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3L)
+    if (((uint32_t) pdma_base) != PDMA0_BASE) {
+        error("In secure domain, only PDMA0 is accessible and shall be used for secure peripheral");
+    }
+#else
     if (((uint32_t) pdma_base) != (PDMA1_BASE + NS_OFFSET)) {
         error("In non-secure domain, only PDMA1 is accessible and shall be used for non-secure peripheral");
     }
+#endif
 
     PDMA_Open(pdma_base, 0);
 

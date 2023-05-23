@@ -39,12 +39,12 @@
 /* Exported constants --------------------------------------------------------*/
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions --------------------------------------------------------*/
-/** @addtogroup OPAMPEx_Exported_Functions
+/** @addtogroup OPAMPEx_Exported_Functions OPAMPEx Exported Functions
   * @{
   */
 
 /* I/O operation functions  *****************************************************/
-/** @addtogroup OPAMPEx_Exported_Functions_Group1
+/** @addtogroup OPAMPEx_Exported_Functions_Group1 Extended Input and Output operation functions
   * @{
   */
 

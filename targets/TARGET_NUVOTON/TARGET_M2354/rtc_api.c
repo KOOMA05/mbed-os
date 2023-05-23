@@ -25,6 +25,14 @@
 #include "nu_modutil.h"
 #include "nu_miscutil.h"
 #include "mbed_mktime.h"
+#include "partition_M2354.h"
+#include "hal_secure.h"
+
+/* On M2354, RTC_WaitAccessEnable() is unnecessary and is not provided by BSP.
+ * Provide a dummy one to make code consistent. */
+__STATIC_INLINE void RTC_WaitAccessEnable(void)
+{
+}
 
 /* Secure attribution of RTC
  *
@@ -33,6 +41,33 @@
  * On M2351, configured to secure
  * On M2354, hard-wired to secure
  */
+
+void rtc_init(void)
+{
+    rtc_init_s();
+}
+
+void rtc_free(void)
+{
+    rtc_free_s();
+}
+
+int rtc_isenabled(void)
+{
+    return rtc_isenabled_s();
+}
+
+time_t rtc_read(void)
+{
+    return rtc_read_s();
+}
+
+void rtc_write(time_t t)
+{
+    rtc_write_s(t);
+}
+
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
 
 /* Micro seconds per second */
 #define NU_US_PER_SEC               1000000
@@ -94,37 +129,53 @@ static time_t t_write = 0;
 /* Convert date time from H/W RTC to struct TM */
 static void rtc_convert_datetime_hwrtc_to_tm(struct tm *datetime_tm, const S_RTC_TIME_DATA_T *datetime_hwrtc);
 
-void rtc_init(void)
+static const struct nu_modinit_s rtc_modinit = {RTC_0, RTC_MODULE, RTC_LXTCTL_RTCCKSEL_LXT, 0, 0, RTC_IRQn, NULL};
+
+static void rtc_init_impl(void);
+static void rtc_free_impl(void);
+static int32_t rtc_isenabled_impl(void);
+static int64_t rtc_read_impl(void);
+static void rtc_write_impl(int64_t t);
+
+static void rtc_init_impl(void)
 {
-    if (rtc_isenabled()) {
+    if (rtc_isenabled_impl()) {
         return;
     }
 
-    RTC_Open_S(NULL);
+    RTC_Open(NULL);
 
     /* POSIX time origin (00:00:00 UTC, Thursday, 1 January 1970) */
-    rtc_write(0);
+    rtc_write_impl(0);
 }
 
-void rtc_free(void)
+static void rtc_free_impl(void)
 {
-    RTC_Close_S();
+    CLK_DisableModuleClock_S(rtc_modinit.clkidx);
 }
 
-int rtc_isenabled(void)
+static int32_t rtc_isenabled_impl(void)
 {
-    return nu_rtc_isenabled_s();
+    // To access (RTC) registers, clock must be enabled first.
+    // For TZ, with RTC being secure, we needn't call the secure gateway versions.
+    CLK_EnableModuleClock(rtc_modinit.clkidx);
+    CLK_SetModuleClock(rtc_modinit.clkidx, rtc_modinit.clksrc, rtc_modinit.clkdiv);
+
+    RTC_T *rtc_base = (RTC_T *) NU_MODBASE(rtc_modinit.modname);
+    
+    // NOTE: Check RTC Init Active flag to support crossing reset cycle.
+    return !! (rtc_base->INIT & RTC_INIT_ACTIVE_Msk);
 }
 
-time_t rtc_read(void)
+static int64_t rtc_read_impl(void)
 {
     /* NOTE: After boot, RTC time registers are not synced immediately, about 1 sec latency.
      *       RTC time got (through RTC_GetDateAndTime()) in this sec would be last-synced and incorrect.
      *       NUC472/M453: Known issue
      *       M487: Fixed
      */
-    if (! rtc_isenabled()) {
-        rtc_init();
+    if (! rtc_isenabled_impl()) {
+        rtc_init_impl();
     }
 
     /* Used for intermediary between date time of H/W RTC and POSIX time */
@@ -141,12 +192,16 @@ time_t rtc_read(void)
         }
 
         /* Load t_write from RTC spare register to cross reset cycle */
-        t_write = nu_rtc_read_spare_register_s(0);
+        RTC_T *rtc_base = (RTC_T *) NU_MODBASE(rtc_modinit.modname);
+        RTC_WaitAccessEnable();
+        RTC_EnableSpareAccess();
+        RTC_WaitAccessEnable();
+        t_write = RTC_READ_SPARE_REGISTER(rtc_base, 0);
     }
 
     S_RTC_TIME_DATA_T hwrtc_datetime_2K_present;
-    RTC_WaitAccessEnable_S();
-    RTC_GetDateAndTime_S(&hwrtc_datetime_2K_present);
+    RTC_WaitAccessEnable();
+    RTC_GetDateAndTime(&hwrtc_datetime_2K_present);
     /* Convert date time from H/W RTC to struct TM */
     rtc_convert_datetime_hwrtc_to_tm(&datetime_tm, &hwrtc_datetime_2K_present);
     /* Convert date time of struct TM to POSIX time */
@@ -160,19 +215,23 @@ time_t rtc_read(void)
     return t_present;
 }
 
-void rtc_write(time_t t)
+static void rtc_write_impl(int64_t t)
 {
-    if (! rtc_isenabled()) {
-        rtc_init();
+    if (! rtc_isenabled_impl()) {
+        rtc_init_impl();
     }
 
     t_write = t;
 
     /* Store t_write to RTC spare register to cross reset cycle */
-    nu_rtc_write_spare_register_s(0, t_write);
+    RTC_T *rtc_base = (RTC_T *) NU_MODBASE(rtc_modinit.modname);
+    RTC_WaitAccessEnable();
+    RTC_EnableSpareAccess();
+    RTC_WaitAccessEnable();
+    RTC_WRITE_SPARE_REGISTER(rtc_base, 0, t_write);
 
-    RTC_WaitAccessEnable_S();
-    RTC_SetDateAndTime_S((S_RTC_TIME_DATA_T *) &DATETIME_HWRTC_ORIGIN);
+    RTC_WaitAccessEnable();
+    RTC_SetDateAndTime((S_RTC_TIME_DATA_T *) &DATETIME_HWRTC_ORIGIN);
     /* NOTE: When engine is clocked by low power clock source (LXT/LIRC), we need to wait for 3 engine clocks. */
     wait_us((NU_US_PER_SEC / NU_RTCCLK_PER_SEC) * 3);
 }
@@ -202,5 +261,37 @@ static void rtc_convert_datetime_hwrtc_to_tm(struct tm *datetime_tm, const S_RTC
     datetime_tm->tm_min  = datetime_hwrtc->u32Minute;
     datetime_tm->tm_sec  = datetime_hwrtc->u32Second;
 }
+
+__NONSECURE_ENTRY
+void rtc_init_s(void)
+{
+    rtc_init_impl();
+}
+
+__NONSECURE_ENTRY
+void rtc_free_s(void)
+{
+    rtc_free_impl();
+}
+
+__NONSECURE_ENTRY
+int32_t rtc_isenabled_s(void)
+{
+    return rtc_isenabled_impl();
+}
+
+__NONSECURE_ENTRY
+int64_t rtc_read_s(void)
+{
+    return rtc_read_impl();
+}
+
+__NONSECURE_ENTRY
+void rtc_write_s(int64_t t)
+{
+    rtc_write_impl(t);
+}
+
+#endif
 
 #endif  /* #if DEVICE_RTC */

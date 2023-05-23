@@ -14,7 +14,6 @@
  */
 
 #include "flash_api.h"
-#include "platform/mbed_critical.h"
 
 #if DEVICE_FLASH
 
@@ -73,7 +72,7 @@ static uint32_t GetBank(uint32_t Addr)
 int32_t flash_init(flash_t *obj)
 {
 #ifdef TARGET_TFM
-    /* TFM implementation needs dual bank configuration */
+/* TFM implementation needs dual bank configuration */
     if (READ_BIT(FLASH->OPTR, FLASH_OPTR_DBANK) != 0U) {
         return 0;
     } else {
@@ -94,6 +93,27 @@ int32_t flash_free(flash_t *obj)
     return 0;
 }
 
+static int32_t flash_unlock(void)
+{
+    /* Allow Access to Flash control registers and user Falsh */
+    if (HAL_FLASH_Unlock()) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+static int32_t flash_lock(void)
+{
+    /* Disable the Flash option control register access (recommended to protect
+    the option Bytes against possible unwanted operations) */
+    if (HAL_FLASH_Lock()) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
 /** Erase one sector starting at defined address
  *
  * The address should be at sector boundary. This function does not do any check for address alignments
@@ -111,11 +131,9 @@ int32_t flash_erase_sector(flash_t *obj, uint32_t address)
         return -1;
     }
 
-    if (HAL_FLASH_Unlock() != HAL_OK) {
+    if (flash_unlock() != HAL_OK) {
         return -1;
     }
-
-    core_util_critical_section_enter();
 
     /* Clear error programming flags */
     __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_ALL_ERRORS);
@@ -136,9 +154,7 @@ int32_t flash_erase_sector(flash_t *obj, uint32_t address)
         return -1;
     }
 
-    core_util_critical_section_exit();
-
-    if (HAL_FLASH_Lock() != HAL_OK) {
+    if (flash_lock() != HAL_OK) {
         return -1;
     }
 
@@ -170,7 +186,7 @@ int32_t flash_program_page(flash_t *obj, uint32_t address,
         return -1;
     }
 
-    if (HAL_FLASH_Unlock() != HAL_OK) {
+    if (flash_unlock() != HAL_OK) {
         return -1;
     }
 
@@ -210,9 +226,7 @@ int32_t flash_program_page(flash_t *obj, uint32_t address,
         }
     }
 
-    if (HAL_FLASH_Unlock() != HAL_OK) {
-        return -1;
-    }
+    status = flash_unlock();
 
     return status;
 }

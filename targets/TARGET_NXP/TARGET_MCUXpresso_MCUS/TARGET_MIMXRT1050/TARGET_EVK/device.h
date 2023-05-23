@@ -2,7 +2,6 @@
 // Check the 'features' section of the target description in 'targets.json' for more details.
 /* mbed Microcontroller Library
  * Copyright (c) 2006-2013 ARM Limited
- * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,10 +39,6 @@
 #endif
 
 #define BOARD_ENET_PHY_ADDR    (2)
-
-/* CMSIS defines this, we use it as linker symbol, undefined it and let a linker symbol
- to be as vector table */
-#undef __VECTOR_TABLE
 
 #include "objects.h"
 

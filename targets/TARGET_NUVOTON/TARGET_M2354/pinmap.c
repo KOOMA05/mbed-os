@@ -22,17 +22,15 @@
 #include "PortNames.h"
 #include "PeripheralNames.h"
 #include "mbed_error.h"
+#include "partition_M2354.h"
+#include "hal_secure.h"
 
 /**
  * Configure pin multi-function
  */
 void pin_function(PinName pin, int data)
 {
-    MBED_ASSERT(pin != (PinName)NC);
-    uint32_t pin_index = NU_PINNAME_TO_PIN(pin);
-    uint32_t port_index = NU_PINNAME_TO_PORT(pin);
-
-    nu_pin_function_s(port_index, pin_index, (uint32_t) data);
+    pin_function_s(pin, data);
 }
 
 /**
@@ -96,3 +94,32 @@ const PeripheralList *pinmap_restricted_peripherals()
 
     return &peripheral_list;
 }
+
+#if defined(__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
+
+static void pin_function_impl(int32_t pin, int32_t data, bool nonsecure_caller)
+{
+    MBED_ASSERT(pin != (PinName)NC);
+    uint32_t pin_index = NU_PINNAME_TO_PIN(pin);
+    uint32_t port_index = NU_PINNAME_TO_PORT(pin);
+
+    /* Guard access to secure GPIO from non-secure domain */
+    if (nonsecure_caller &&
+        (! (SCU_INIT_IONSSET_VAL & (1 << (port_index + 0))))) {
+        error("Non-secure domain tries to control secure or undefined GPIO.");
+    }
+
+    __IO uint32_t *GPx_MFPx = ((__IO uint32_t *) &SYS->GPA_MFPL) + port_index * 2 + (pin_index / 8);
+    uint32_t MFP_Msk = NU_MFP_MSK(pin_index);
+
+    // E.g.: SYS->GPA_MFPL  = (SYS->GPA_MFPL & (~SYS_GPA_MFPL_PA0MFP_Msk) ) | SYS_GPA_MFPL_PA0MFP_SC0_CD  ;
+    *GPx_MFPx  = (*GPx_MFPx & (~MFP_Msk)) | data;
+}
+
+__NONSECURE_ENTRY
+void pin_function_s(int32_t pin, int32_t data)
+{
+    pin_function_impl(pin, data, cmse_nonsecure_caller());
+}
+
+#endif

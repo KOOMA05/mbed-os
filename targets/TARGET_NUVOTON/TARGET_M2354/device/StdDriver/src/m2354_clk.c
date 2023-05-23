@@ -113,6 +113,7 @@ void CLK_Idle(void)
   * @details    This function get external high frequency crystal frequency. The frequency unit is Hz.
   */
 #if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
+__NONSECURE_ENTRY
 uint32_t CLK_GetHXTFreq(void)
 {
     uint32_t u32Freq = 0UL;
@@ -139,6 +140,7 @@ uint32_t CLK_GetHXTFreq(void)
   */
 
 #if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
+__NONSECURE_ENTRY
 uint32_t CLK_GetLXTFreq(void)
 {
     uint32_t u32Freq = 0UL;
@@ -165,6 +167,7 @@ uint32_t CLK_GetLXTFreq(void)
   */
 
 #if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
+__NONSECURE_ENTRY
 uint32_t CLK_GetHCLKFreq(void)
 {
     SystemCoreClockUpdate();
@@ -180,6 +183,7 @@ uint32_t CLK_GetHCLKFreq(void)
   */
 
 #if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
+__NONSECURE_ENTRY
 uint32_t CLK_GetPCLK0Freq(void)
 {
     SystemCoreClockUpdate();
@@ -195,6 +199,7 @@ uint32_t CLK_GetPCLK0Freq(void)
   */
 
 #if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
+__NONSECURE_ENTRY
 uint32_t CLK_GetPCLK1Freq(void)
 {
     SystemCoreClockUpdate();
@@ -210,6 +215,7 @@ uint32_t CLK_GetPCLK1Freq(void)
   */
 
 #if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
+__NONSECURE_ENTRY
 uint32_t CLK_GetCPUFreq(void)
 {
     uint32_t u32Freq, u32HclkSrc, u32HclkDiv;
@@ -1216,6 +1222,7 @@ void CLK_EnableSPDWKPin(uint32_t u32Port, uint32_t u32Pin, uint32_t u32TriggerTy
   */
 
 #if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
+__NONSECURE_ENTRY
 uint32_t CLK_GetPLLClockFreq(void)
 {
     uint32_t u32PllFreq = 0UL, u32PllReg;
@@ -1306,6 +1313,7 @@ uint32_t CLK_GetPLLClockFreq(void)
   */
 
 #if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
+__NONSECURE_ENTRY
 uint32_t CLK_GetModuleClockSource(uint32_t u32ModuleIdx)
 {
     uint32_t u32TmpVal = 0UL, u32TmpAddr = 0UL;
@@ -1379,6 +1387,7 @@ uint32_t CLK_GetModuleClockSource(uint32_t u32ModuleIdx)
   */
 
 #if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
+__NONSECURE_ENTRY
 uint32_t CLK_GetModuleClockDivider(uint32_t u32ModuleIdx)
 {
     uint32_t u32TmpVal = 0UL, u32TmpAddr = 0UL;

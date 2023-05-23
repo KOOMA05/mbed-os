@@ -4,8 +4,7 @@
   * @author  MCD Application Team
   * @brief   EXTI HAL module driver.
   *          This file provides firmware functions to manage the following
-  *          functionalities of the Extended Interrupts and event controller
-  *          (EXTI) peripheral:
+  *          functionalities of the General Purpose Input/Output (EXTI) peripheral:
   *           + Initialization and de-initialization functions
   *           + IO operation functions
   *
@@ -26,14 +25,14 @@
         (++) Falling
         (++) Both of them
 
-    (+) When set in interrupt mode, configurable Exti lines have two different
+    (+) When set in interrupt mode, configurable Exti lines have two diffenrents
         interrupt pending registers which allow to distinguish which transition
         occurs:
         (++) Rising edge pending interrupt
         (++) Falling
 
     (+) Exti lines 0 to 15 are linked to gpio pin number 0 to 15. Gpio port can
-        be selected through multiplexer.
+        be selected throught multiplexer.
 
                      ##### How to use this driver #####
   ==============================================================================

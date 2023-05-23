@@ -25,6 +25,7 @@ extern "C"
 }
 #include "USBPhyHw.h"
 #include "rza_io_regrw.h"
+#include "USBDevice_Types.h"
 #include "USBEndpoints_RZ_A1.h"
 #include "USBPhy_RZ_A1_Def.h"
 

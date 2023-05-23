@@ -4,13 +4,11 @@
 * Description:
 * Clock configuration
 * This file was automatically generated and should not be modified.
-* Tools Package 2.2.0.2790
-* latest-v2.X 2.0.0.6211
-* personalities 3.0.0.0
-* udd 3.0.0.562
+* cfg-backend-cli: 1.2.0.1478
+* Device Support Library (../../../../output/psoc6/psoc6pdl): 1.4.0.1571
 *
 ********************************************************************************
-* Copyright 2020 Cypress Semiconductor Corporation
+* Copyright 2017-2019 Cypress Semiconductor Corporation
 * SPDX-License-Identifier: Apache-2.0
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,15 +38,11 @@ extern "C" {
 #endif
 
 #define CYBSP_CSD_CLK_DIV_ENABLED 1U
-#define CYBSP_CS_CLK_DIV_ENABLED CYBSP_CSD_CLK_DIV_ENABLED
 #define CYBSP_CSD_CLK_DIV_HW CY_SYSCLK_DIV_8_BIT
-#define CYBSP_CS_CLK_DIV_HW CYBSP_CSD_CLK_DIV_HW
 #define CYBSP_CSD_CLK_DIV_NUM 0U
-#define CYBSP_CS_CLK_DIV_NUM CYBSP_CSD_CLK_DIV_NUM
 
 #if defined (CY_USING_HAL)
 	extern const cyhal_resource_inst_t CYBSP_CSD_CLK_DIV_obj;
-	#define CYBSP_CS_CLK_DIV_obj CYBSP_CSD_CLK_DIV_obj
 #endif //defined (CY_USING_HAL)
 
 void init_cycfg_clocks(void);

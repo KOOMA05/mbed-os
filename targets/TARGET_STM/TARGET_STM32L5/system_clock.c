@@ -30,8 +30,10 @@
 **/
 
 #include "stm32l5xx.h"
+#include "nvic_addr.h"
 #include "mbed_error.h"
 #include "mbed_toolchain.h"
+
 
 // clock source is selected with CLOCK_SOURCE in json config
 #define USE_PLL_HSE_EXTC 0x8 // Use external clock (ST Link MCO - not enabled by default)
@@ -50,6 +52,9 @@ uint8_t SetSysClock_PLL_HSI(void);
 #if ((CLOCK_SOURCE) & USE_PLL_MSI)
 uint8_t SetSysClock_PLL_MSI(void);
 #endif /* ((CLOCK_SOURCE) & USE_PLL_MSI) */
+
+
+
 
 
 /**
@@ -97,7 +102,7 @@ MBED_WEAK void SetSysClock(void)
 /******************************************************************************/
 /*            PLL (clocked by HSE) used as System clock source                */
 /******************************************************************************/
-MBED_WEAK  uint8_t SetSysClock_PLL_HSE(uint8_t bypass)
+uint8_t SetSysClock_PLL_HSE(uint8_t bypass)
 {
     return 0; // FAIL // TODO
 }
@@ -121,19 +126,20 @@ uint8_t SetSysClock_PLL_MSI(void)
 {
     RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
     RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-    
-    /* Configure LSE Drive Capability */
-    __HAL_RCC_PWR_CLK_ENABLE();
-    __HAL_RCC_SYSCFG_CLK_ENABLE();
-    HAL_PWR_EnableBkUpAccess();
-    __HAL_RCC_RTCAPB_CLK_ENABLE();
 
     /* Configure the main internal regulator output voltage */
     if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE0) != HAL_OK) {
         return 0; // FAIL
     }
 
+    /* Configure LSE Drive Capability */
+    __HAL_RCC_PWR_CLK_ENABLE();
+    __HAL_RCC_SYSCFG_CLK_ENABLE();
+    HAL_PWR_EnableBkUpAccess();
+    __HAL_RCC_RTCAPB_CLK_ENABLE();
+
 #if MBED_CONF_TARGET_LSE_AVAILABLE
+    __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
     RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE;
     RCC_OscInitStruct.PLL.PLLState   = RCC_PLL_NONE;
     RCC_OscInitStruct.LSEState       = RCC_LSE_ON;   // External 32.768 kHz clock on OSC_IN/OSC_OUT
@@ -147,7 +153,7 @@ uint8_t SetSysClock_PLL_MSI(void)
     RCC_OscInitStruct.MSIState            = RCC_MSI_ON;
     RCC_OscInitStruct.HSEState            = RCC_HSE_OFF;
     RCC_OscInitStruct.HSIState            = RCC_HSI_OFF;
-#if DEVICE_TRNG || DEVICE_USBDEVICE
+#if DEVICE_TRNG
     RCC_OscInitStruct.HSI48State          = RCC_HSI48_ON;
 #else
     RCC_OscInitStruct.HSI48State          = RCC_HSI48_OFF;
@@ -176,21 +182,16 @@ uint8_t SetSysClock_PLL_MSI(void)
         return 0; // FAIL
     }
 
+    // Default STDIO is LPUART1
     RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
 #if DEVICE_TRNG
-    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_RNG;
+    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_LPUART1 | RCC_PERIPHCLK_RNG;
     PeriphClkInitStruct.RngClockSelection = RCC_RNGCLKSOURCE_HSI48;
-    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK) {
-        return 0; // FAIL
-    }
+#else
+    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_LPUART1;
 #endif
-#if DEVICE_USBDEVICE
-    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USB;
-    PeriphClkInitStruct.UsbClockSelection = RCC_USBCLKSOURCE_HSI48;
-    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK) {
-        return 0; // FAIL
-    }
-#endif
+    PeriphClkInitStruct.Lpuart1ClockSelection = RCC_LPUART1CLKSOURCE_LSE;
+    HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
 
     return 1; // OK
 }

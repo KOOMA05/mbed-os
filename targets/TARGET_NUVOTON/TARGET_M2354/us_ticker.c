@@ -24,16 +24,18 @@
 #include "mbed_assert.h"
 #include "nu_modutil.h"
 #include "nu_miscutil.h"
+#include "partition_M2354.h"
 
 /* We have the following policy for configuring security state of TIMER for us_ticer/lp_ticker:
  *
- * TIMER0: Hard-wired to secure for TF-M SPE use
- * TIMER1: Hard-wired to secure for TF-M SPE use
- * TIMER2: Configured to non-secure for NSPE use, including TF-M NSPE test
- * TIMER3: Configured to non-secure for NSPE use
- * TIMER4: Configured to non-secure for Mbed NSPE us_ticer exclusively
- * TIMER5: Configured to non-secure for Mbed NSPE lp_ticer exclusively
+ * TIMER0: Hard-wired to secure and used for secure us_ticer
+ * TIMER1: Hard-wired to secure and used for secure lp_ticer
+ * TIMER2: Configured to non-secure and used for non-secure us_ticer
+ * TIMER3: Configured to non-secure and used for non-secure lp_ticer
  */
+#if (! defined(SCU_INIT_PNSSET2_VAL)) || (! (SCU_INIT_PNSSET2_VAL & (1 << 17)))
+#error("TIMER2/3 must be configured to non-secure for non-secure us_ticker/lp_ticker.")
+#endif
 
 /* Micro seconds per second */
 #define NU_US_PER_SEC               1000000
@@ -46,12 +48,23 @@
 /* Timer max counter */
 #define NU_TMR_MAXCNT               ((1 << NU_TMR_MAXCNT_BITSIZE) - 1)
 
-static void tmr4_vec(void);
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
 
-static const struct nu_modinit_s timer4_modinit = {TIMER_4, TMR4_MODULE, CLK_CLKSEL3_TMR4SEL_PCLK0, 0, TMR4_RST, TMR4_IRQn, (void *) tmr4_vec};
+static void tmr0_vec(void);
 
-#define TIMER_MODINIT       timer4_modinit
+static const struct nu_modinit_s timer0_modinit = {TIMER_0, TMR0_MODULE, CLK_CLKSEL1_TMR0SEL_PCLK0, 0, TMR0_RST, TMR0_IRQn, (void *) tmr0_vec};
 
+#define TIMER_MODINIT       timer0_modinit
+
+#else
+
+static void tmr2_vec(void);
+
+static const struct nu_modinit_s timer2_modinit = {TIMER_2, TMR2_MODULE, CLK_CLKSEL1_TMR2SEL_PCLK1, 0, TMR2_RST, TMR2_IRQn, (void *) tmr2_vec};
+
+#define TIMER_MODINIT       timer2_modinit
+
+#endif
 /* Track ticker status */
 static volatile uint16_t ticker_inited = 0;
 
@@ -191,7 +204,11 @@ const ticker_info_t* us_ticker_get_info()
     return &info;
 }
 
-static void tmr4_vec(void)
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
+static void tmr0_vec(void)
+#else
+static void tmr2_vec(void)
+#endif
 {
     us_ticker_clear_interrupt();
 

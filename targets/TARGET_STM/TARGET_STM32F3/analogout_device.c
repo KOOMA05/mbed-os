@@ -36,10 +36,8 @@
 #include "PeripheralPins.h"
 
 // These variables are used for the "free" function
-static int channel1_used = 0;
-#if defined(DAC_CHANNEL_2)
-static int channel2_used = 0;
-#endif
+static int pa4_used = 0;
+static int pa5_used = 0;
 
 #if STATIC_PINMAP_READY
 #define ANALOGOUT_INIT_DIRECT analogout_init_direct
@@ -110,20 +108,19 @@ static void _analogout_init_direct(dac_t *obj, const PinMap *pinmap)
     sConfig.DAC_OutputSwitch = DAC_OUTPUTSWITCH_ENABLE;
 #endif
 
-    if (obj->channel == DAC_CHANNEL_1) {
-        channel1_used = 1;
+    if (pinmap->pin == PA_4) {
+        pa4_used = 1;
     }
-#if defined(DAC_CHANNEL_2)
-    if (obj->channel == DAC_CHANNEL_2) {
-        channel2_used = 1;
+
+    if (pinmap->pin == PA_5) {
+        pa5_used = 1;
     }
-#endif
+
     if (HAL_DAC_ConfigChannel(&obj->handle, &sConfig, obj->channel) != HAL_OK) {
         error("HAL_DAC_ConfigChannel failed");
     }
 
     analogout_write_u16(obj, 0);
-    HAL_DAC_Start(&obj->handle, obj->channel);
 }
 
 void analogout_init(dac_t *obj, PinName pin)
@@ -139,34 +136,29 @@ void analogout_init(dac_t *obj, PinName pin)
 void analogout_free(dac_t *obj)
 {
     // Reset DAC and disable clock
-    if (obj->channel == DAC_CHANNEL_1) {
-        channel1_used = 0;
+    if (obj->pin == PA_4) {
+        pa4_used = 0;
     }
-#if defined(DAC_CHANNEL_2)
-    if (obj->channel == DAC_CHANNEL_2) {
-        channel2_used = 0;
+    if (obj->pin == PA_5) {
+        pa5_used = 0;
     }
-#endif
-    if ((channel1_used == 0)
-#if defined(DAC_CHANNEL_2)
-        && (channel2_used == 0)
-#endif
-        ) {
+
+    if ((pa4_used == 0) && (pa5_used == 0)) {
         __HAL_RCC_DAC1_FORCE_RESET();
         __HAL_RCC_DAC1_RELEASE_RESET();
         __HAL_RCC_DAC1_CLK_DISABLE();
     }
 
 #if defined(DAC2)
-    if (obj->dac == DAC_2) {
+    if (obj->pin == PA_6) {
         __HAL_RCC_DAC2_FORCE_RESET();
         __HAL_RCC_DAC2_RELEASE_RESET();
         __HAL_RCC_DAC2_CLK_DISABLE();
     }
 #endif
 
-    // Configure GPIO back to reset value
-    pin_function(obj->pin, STM_PIN_DATA(STM_MODE_ANALOG, GPIO_NOPULL, 0));
+    // Configure GPIO
+    pin_function(obj->pin, STM_PIN_DATA(STM_MODE_INPUT, GPIO_NOPULL, 0));
 }
 
 const PinMap *analogout_pinmap()

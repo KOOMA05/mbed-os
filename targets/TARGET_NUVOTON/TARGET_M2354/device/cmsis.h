@@ -20,10 +20,13 @@
 #define MBED_CMSIS_H
 
 #include "M2354.h"
+#include "stddriver_secure.h"
 #include "cmsis_nvic.h"
-#if TARGET_TFM
 #include "partition_M2354.h"
-#include "platform_extra_secure.h"
+
+/* Check relevant macro has been defined */
+#if (! defined(NU_ROM_SIZE_S))
+#error("NU_ROM_SIZE_S not defined")
 #endif
 
 // Support linker-generated symbol as start of relocated vector table.
@@ -33,6 +36,11 @@ extern uint32_t Image$$ER_IRAMVEC$$ZI$$Base;
 
 #elif defined(__GNUC__)
 extern uint32_t __start_vector_table__;
+#endif
+
+/* TZ_START_NS: Start address of non-secure application */
+#ifndef TZ_START_NS
+#define TZ_START_NS (NS_OFFSET + NU_ROM_SIZE_S)
 #endif
 
 #endif

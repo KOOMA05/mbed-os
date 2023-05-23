@@ -20,6 +20,7 @@
 #define __PIN_NAMES_COMMON_H__
 
 #include "cmsis.h"
+#include "partition_M2354.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,8 +48,11 @@ __STATIC_INLINE GPIO_T *NU_PORT_BASE(uint32_t PORT)
 {
     uint32_t port_base = ((uint32_t) GPIOA_BASE) + 0x40 * PORT;
 
-    /* No support for secure build. Fixed to non-secure. */
-    port_base += NS_OFFSET;
+#if defined(SCU_INIT_IONSSET_VAL)
+    if (SCU_INIT_IONSSET_VAL & (1 << (PORT + 0))) {
+        port_base += NS_OFFSET;
+    } 
+#endif
 
     return ((GPIO_T *) port_base);
 }
@@ -59,15 +63,26 @@ __STATIC_INLINE GPIO_T *NU_PORT_BASE(uint32_t PORT)
 /* TrustZone-aware version of GPIO_PIN_DATA to get GPIO pin data */
 __STATIC_INLINE uint32_t NU_GET_GPIO_PIN_DATA(uint32_t PORT, uint32_t PIN)
 {
-    /* No support for secure build. Fixed to non-secure. */
-    return GPIO_PIN_DATA_NS(PORT, PIN);
+#if defined(SCU_INIT_IONSSET_VAL)
+    if (SCU_INIT_IONSSET_VAL & (1 << (PORT + 0))) {
+        return GPIO_PIN_DATA_NS(PORT, PIN);
+    } 
+#endif
+
+    return GPIO_PIN_DATA_S(PORT, PIN);
 }
 
 /* TrustZone-aware version of GPIO_PIN_DATA to set GPIO pin data */
 __STATIC_INLINE void NU_SET_GPIO_PIN_DATA(uint32_t PORT, uint32_t PIN, uint32_t VALUE)
 {
-    /* No support for secure build. Fixed to non-secure. */
-    GPIO_PIN_DATA_NS(PORT, PIN) = VALUE;
+#if defined(SCU_INIT_IONSSET_VAL)
+    if (SCU_INIT_IONSSET_VAL & (1 << (PORT + 0))) {
+        GPIO_PIN_DATA_NS(PORT, PIN) = VALUE;
+        return;
+    }
+#endif
+
+    GPIO_PIN_DATA_S(PORT, PIN) = VALUE;
 }
 
 // LEGACY

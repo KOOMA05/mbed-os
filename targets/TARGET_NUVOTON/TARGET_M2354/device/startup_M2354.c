@@ -16,23 +16,6 @@
  * limitations under the License.
  */
 
-#if defined(__GNUC__)
-
-/* Get around error: conflicting type qualifiers for '__copy_table_start__'
- *
- * cmsis_gcc.h also imports the following symbols but with different type qualifier:
- *
- * __copy_table_start__
- * __copy_table_end__
- * __zero_table_start__
- * __zero_table_end__
- *
- * Define `__PROGRAM_START` to exclude __cmsis_start() in cmsis_gcc.h.
- */
-#define __PROGRAM_START
-
-#endif
-
 #include "M2354.h"
 
 /* Suppress warning messages */
@@ -71,14 +54,31 @@ void FUN(void) __attribute__ ((weak, alias(#FUN_ALIAS)));
 
 /* Initialize segments */
 #if defined(__ARMCC_VERSION)
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U) && (TFM_LVL > 0)
+extern uint32_t Image$$ARM_LIB_STACK_MSP$$ZI$$Limit;
 extern uint32_t Image$$ARM_LIB_STACK$$ZI$$Limit;
+#else
+extern uint32_t Image$$ARM_LIB_STACK$$ZI$$Limit;
+#endif
 extern void __main(void);
 #elif defined(__ICCARM__)
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U) && (TFM_LVL > 0)
+extern uint32_t Image$$ARM_LIB_STACK_MSP$$ZI$$Limit;
+extern uint32_t Image$$ARM_LIB_STACK$$ZI$$Limit;
+extern uint32_t CSTACK_MSP$$Limit;
+extern uint32_t CSTACK$$Limit;
+#else
 extern uint32_t Image$$ARM_LIB_STACK$$ZI$$Limit;
 extern uint32_t CSTACK$$Limit;
+#endif
 void __iar_program_start(void);
 #elif defined(__GNUC__)
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U) && (TFM_LVL > 0)
+extern uint32_t Image$$ARM_LIB_STACK_MSP$$ZI$$Limit;
 extern uint32_t Image$$ARM_LIB_STACK$$ZI$$Limit;
+#else
+extern uint32_t Image$$ARM_LIB_STACK$$ZI$$Limit;
+#endif
 extern uint32_t __StackTop;
 extern uint32_t __copy_table_start__;
 extern uint32_t __copy_table_end__;
@@ -91,6 +91,9 @@ extern void _start(void);
 #error("For GCC toolchain, only support GNU ARM Embedded")
 #endif
 #endif
+
+/* SCU handler */
+void SCU_IRQHandler(void);
 
 /* Default empty handler */
 void Default_Handler(void);
@@ -196,7 +199,7 @@ WEAK_ALIAS_FUNC(GPH_IRQHandler, Default_Handler)        // 88:
 WEAK_ALIAS_FUNC(EINT7_IRQHandler, Default_Handler)      // 89:
                                                         // 90~97: Reserved
 WEAK_ALIAS_FUNC(PDMA1_IRQHandler, Default_Handler)      // 98: Peripheral DMA 1
-WEAK_ALIAS_FUNC(SCU_IRQHandler, Default_Handler)        // 99: SCU
+                                                        // 99: SCU
 WEAK_ALIAS_FUNC(LCD_IRQHandler, Default_Handler)        // 100: LCD
 WEAK_ALIAS_FUNC(TRNG_IRQHandler, Default_Handler)       // 101: TRNG
                                                         // 102~108: Reserved
@@ -220,12 +223,22 @@ const uint32_t __vector_handlers[] = {
 #endif
 
     /* Configure Initial Stack Pointer, using linker-generated symbols */
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U) && (TFM_LVL > 0)
+#if defined(__ARMCC_VERSION)
+    (uint32_t) &Image$$ARM_LIB_STACK_MSP$$ZI$$Limit,
+#elif defined(__ICCARM__)
+    (uint32_t) &CSTACK_MSP$$Limit,
+#elif defined(__GNUC__)
+    (uint32_t) &__StackTop,
+#endif
+#else
 #if defined(__ARMCC_VERSION)
     (uint32_t) &Image$$ARM_LIB_STACK$$ZI$$Limit,
 #elif defined(__ICCARM__)
     (uint32_t) &CSTACK$$Limit,
 #elif defined(__GNUC__)
     (uint32_t) &__StackTop,
+#endif
 #endif
 
     (uint32_t) Reset_Handler,           // Reset Handler
@@ -374,6 +387,13 @@ const uint32_t __vector_handlers[] = {
  *   C/C++ runtime initialization
  */
 
+/* Forward declaration */
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U) && (TFM_LVL > 0)
+/* Limited by inline assembly syntax, esp. on IAR, we cannot get stack limit
+ * for PSP just from external symbol. To avoid re-write in assembly, We make up
+ * a function here to get this value indirectly. */
+uint32_t StackLimit_PSP(void);
+#endif
 void Reset_Handler_1(void);
 
 /* Add '__attribute__((naked))' here to make sure compiler does not generate prologue and
@@ -391,6 +411,25 @@ __attribute__((naked)) void Reset_Handler(void)
     __asm(".syntax  unified                                         \n");
 #endif
 
+    /* Secure TFM requires PSP as boot stack */
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U) && (TFM_LVL > 0)
+    /* Get stack limit for PSP */
+#if !defined(__ICCARM__)
+    __asm("movw     r0, #:lower16:StackLimit_PSP                    \n");
+    __asm("movt     r0, #:upper16:StackLimit_PSP                    \n");
+#else
+    __asm("mov32    r0, StackLimit_PSP                              \n");
+#endif
+    __asm("blx      r0                                              \n");
+
+    /* Switch from MSP to PSP */
+    __asm("msr      psp, r0                                         \n");
+    __asm("mrs      r0, control                                     \n");
+    __asm("movs     r1, #2                                          \n");
+    __asm("orrs     r0, r1                                          \n");
+    __asm("msr      control, r0                                     \n");
+#endif
+
     /* Jump to Reset_Handler_1 */
 #if !defined(__ICCARM__)
     __asm("movw     r0, #:lower16:Reset_Handler_1                   \n");
@@ -400,6 +439,26 @@ __attribute__((naked)) void Reset_Handler(void)
 #endif
     __asm("bx       r0                                              \n");
 }
+
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U) && (TFM_LVL > 0)
+/* Return stack limit for PSP */
+uint32_t StackLimit_PSP(void)
+{
+    uint32_t stacklimit_psp;
+
+    __asm volatile (
+#if defined(__GNUC__)
+        ".syntax  unified                                           \n"
+#endif
+        "mov    %[Rd], %[Rn]                                        \n"
+        : [Rd] "=r" (stacklimit_psp)                                    /* comma-separated list of output operands */
+        : [Rn] "r" (&Image$$ARM_LIB_STACK$$ZI$$Limit)                   /* comma-separated list of input operands */
+        : "cc"                                                          /* comma-separated list of clobbered resources */
+    );
+
+    return stacklimit_psp;
+}
+#endif
 
 void Reset_Handler_1(void)
 {

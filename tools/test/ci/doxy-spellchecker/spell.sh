@@ -114,9 +114,7 @@ while read file; do
         echo "_________________________________"
     fi
 
-# ${1}: directory to check
-# ${2}: file containing a list of paths (regex) to exclude
-done < <(find "${1}" -type d -iname "*target*" -prune -o -name '*.h' -print | grep -v -f "${2}")
+done < <(find "${1}" -type d -iname "*target*" -prune -o -name '*.h' -print)
 
 echo "----------------------------------------------------------------------------------"
 echo "Total Errors Found: ${ERRORS}"

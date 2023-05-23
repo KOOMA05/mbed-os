@@ -25,16 +25,18 @@
 #include "nu_modutil.h"
 #include "nu_timer.h"
 #include "nu_miscutil.h"
+#include "partition_M2354.h"
 
 /* We have the following policy for configuring security state of TIMER for us_ticer/lp_ticker:
  *
- * TIMER0: Hard-wired to secure for TF-M SPE use
- * TIMER1: Hard-wired to secure for TF-M SPE use
- * TIMER2: Configured to non-secure for NSPE use, including TF-M NSPE test
- * TIMER3: Configured to non-secure for NSPE use
- * TIMER4: Configured to non-secure for Mbed NSPE us_ticer exclusively
- * TIMER5: Configured to non-secure for Mbed NSPE lp_ticer exclusively
+ * TIMER0: Hard-wired to secure and used for secure us_ticer
+ * TIMER1: Hard-wired to secure and used for secure lp_ticer
+ * TIMER2: Configured to non-secure and used for non-secure us_ticer
+ * TIMER3: Configured to non-secure and used for non-secure lp_ticer
  */
+#if (! defined(SCU_INIT_PNSSET2_VAL)) || (! (SCU_INIT_PNSSET2_VAL & (1 << 17)))
+#error("TIMER2/3 must be configured to non-secure for non-secure us_ticker/lp_ticker.")
+#endif
 
 /* Micro seconds per second */
 #define NU_US_PER_SEC               1000000
@@ -47,12 +49,25 @@
 /* Timer max counter */
 #define NU_TMR_MAXCNT               ((1 << NU_TMR_MAXCNT_BITSIZE) - 1)
 
-static void tmr5_vec(void);
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
+
+static void tmr1_vec(void);
 
 /* NOTE: To wake the system from power down mode, timer clock source must be ether LXT or LIRC. */
-static const struct nu_modinit_s timer5_modinit = {TIMER_5, TMR5_MODULE, CLK_CLKSEL3_TMR5SEL_LXT, 0, TMR5_RST, TMR5_IRQn, (void *) tmr5_vec};
+static const struct nu_modinit_s timer1_modinit = {TIMER_1, TMR1_MODULE, CLK_CLKSEL1_TMR1SEL_LXT, 0, TMR1_RST, TMR1_IRQn, (void *) tmr1_vec};
 
-#define TIMER_MODINIT       timer5_modinit
+#define TIMER_MODINIT       timer1_modinit
+
+#else
+
+static void tmr3_vec(void);
+
+/* NOTE: To wake the system from power down mode, timer clock source must be ether LXT or LIRC. */
+static const struct nu_modinit_s timer3_modinit = {TIMER_3, TMR3_MODULE, CLK_CLKSEL1_TMR3SEL_LXT, 0, TMR3_RST, TMR3_IRQn, (void *) tmr3_vec};
+
+#define TIMER_MODINIT       timer3_modinit
+
+#endif
 
 /* Timer interrupt enable/disable
  * 
@@ -235,7 +250,11 @@ const ticker_info_t* lp_ticker_get_info()
     return &info;
 }
 
-static void tmr5_vec(void)
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
+static void tmr1_vec(void)
+#else
+static void tmr3_vec(void)
+#endif
 {
     lp_ticker_clear_interrupt();
 

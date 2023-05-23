@@ -578,9 +578,8 @@ typedef volatile unsigned short vu16;
 #define TRUE          (1UL)                ///< Boolean true, define to use in API parameters or return value
 #define FALSE         (0UL)                ///< Boolean false, define to use in API parameters or return value
 
-/* Not used on Mbed OS. Remove to get around name conflict */
-//#define ENABLE        (1UL)                ///< Enable, define to use in API parameters
-//#define DISABLE       (0UL)                ///< Disable, define to use in API parameters
+#define ENABLE        (1UL)                ///< Enable, define to use in API parameters
+#define DISABLE       (0UL)                ///< Disable, define to use in API parameters
 
 /* Define one bit mask */
 #define BIT0          (0x00000001UL)       ///< Bit 0 mask of an 32 bit integer

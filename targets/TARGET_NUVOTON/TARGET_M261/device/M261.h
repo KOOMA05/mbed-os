@@ -518,9 +518,8 @@ typedef volatile unsigned short vu16;
 #define TRUE        (1L)
 #define FALSE       (0L)
 
-/* Not used on Mbed OS. Remove to get around name conflict */
-//#define ENABLE      1
-//#define DISABLE     0
+#define ENABLE      1
+#define DISABLE     0
 
 /* Bit Mask Definitions */
 #define BIT0    0x00000001UL

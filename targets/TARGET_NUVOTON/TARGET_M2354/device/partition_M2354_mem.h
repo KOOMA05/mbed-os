@@ -33,30 +33,118 @@
  *       (already there or via copy).
  */
 
-#include "nu_tfm_import_define.h"
-#include NU_TFM_S_REGION_DEFS_H_PATH
-#include "nu_tfm_import_undefine.h"
+#if defined(DOMAIN_NS) && DOMAIN_NS
 
-/* Resolve MBED_ROM_START and friends
- *
- * TF-M exported region_defs.h essentially resolves MBED_ROM_START and friends.
- * target.mbed_rom_start and friends get unnecessary.
- */
 /* Resolve non-secure ROM start */
-#undef MBED_ROM_START
-#define MBED_ROM_START          NS_CODE_START
+#ifndef MBED_ROM_START
+#ifdef PSA_NON_SECURE_ROM_START
+#define MBED_ROM_START          (PSA_NON_SECURE_ROM_START)
+#else
+#error "MBED_ROM_START not define"
+#endif
+#endif
 
 /* Resolve non-secure ROM size */
-#undef MBED_ROM_SIZE
-#define MBED_ROM_SIZE           NS_CODE_SIZE
+#ifndef MBED_ROM_SIZE
+#ifdef PSA_NON_SECURE_ROM_SIZE
+#define MBED_ROM_SIZE           (PSA_NON_SECURE_ROM_SIZE)
+#else
+#error "MBED_ROM_SIZE not define"
+#endif
+#endif
 
 /* Resolve non-secure RAM start */
-#undef MBED_RAM_START
-#define MBED_RAM_START          NS_DATA_START
+#ifndef MBED_RAM_START
+#ifdef PSA_NON_SECURE_RAM_START
+#define MBED_RAM_START          (PSA_NON_SECURE_RAM_START)
+#else
+#error "MBED_RAM_START not define"
+#endif
+#endif
 
 /* Resolve non-secure RAM size */
-#undef MBED_RAM_SIZE
-#define MBED_RAM_SIZE           NS_DATA_SIZE
+#ifndef MBED_RAM_SIZE
+#ifdef PSA_NON_SECURE_RAM_SIZE
+#define MBED_RAM_SIZE           (PSA_NON_SECURE_RAM_SIZE)
+#else
+#error "MBED_RAM_SIZE not define"
+#endif
+#endif
+
+#else
+
+/* Resolve secure ROM start */
+#ifndef MBED_ROM_START
+#ifdef PSA_SECURE_ROM_START
+#define MBED_ROM_START          (PSA_SECURE_ROM_START)
+#else
+#error "MBED_ROM_START not define"
+#endif
+#endif
+
+/* Resolve secure ROM size */
+#ifndef MBED_ROM_SIZE
+#ifdef PSA_SECURE_ROM_SIZE
+#define MBED_ROM_SIZE           (PSA_SECURE_ROM_SIZE)
+#else
+#error "MBED_ROM_SIZE not define"
+#endif
+#endif
+
+/* Resolve secure RAM start */
+#ifndef MBED_RAM_START
+#ifdef PSA_SECURE_RAM_START
+#define MBED_RAM_START          (PSA_SECURE_RAM_START)
+#else
+#error "MBED_RAM_START not define"
+#endif
+#endif
+
+/* Resolve secure RAM size */
+#ifndef MBED_RAM_SIZE
+#ifdef PSA_SECURE_RAM_SIZE
+#define MBED_RAM_SIZE           (PSA_SECURE_RAM_SIZE)
+#else
+#error "MBED_RAM_SIZE not define"
+#endif
+#endif
+
+#endif
+
+/* Resolved flash/SRAM partition */
+#if defined(DOMAIN_NS) && DOMAIN_NS
+
+/* Resolved secure ROM layout */
+#define NU_ROM_START_S          0x0
+#define NU_ROM_SIZE_S           (0x100000 - MBED_ROM_SIZE)
+/* Resolved secure RAM layout */
+#define NU_RAM_START_S          0x20000000
+#define NU_RAM_SIZE_S           (0x40000 - MBED_RAM_SIZE)
+
+/* Resolved non-secure ROM layout */
+#define NU_ROM_START_NS         MBED_ROM_START
+#define NU_ROM_SIZE_NS          MBED_ROM_SIZE
+/* Resolved non-secure RAM layout */
+#define NU_RAM_START_NS         MBED_RAM_START
+#define NU_RAM_SIZE_NS          MBED_RAM_SIZE
+
+#else
+
+/* Resolved secure ROM layout */
+#define NU_ROM_START_S          MBED_ROM_START
+#define NU_ROM_SIZE_S           MBED_ROM_SIZE
+/* Resolved secure RAM layout */
+#define NU_RAM_START_S          MBED_RAM_START
+#define NU_RAM_SIZE_S           MBED_RAM_SIZE
+
+/* Resolved non-secure ROM layout */
+#define NU_ROM_START_NS         (0x10000000 + MBED_ROM_SIZE)
+#define NU_ROM_SIZE_NS          (0x100000 - MBED_ROM_SIZE)
+/* Resolved non-secure RAM layout */
+#define NU_RAM_START_NS         (0x30000000 + MBED_RAM_SIZE)
+#define NU_RAM_SIZE_NS          (0x40000 - MBED_RAM_SIZE)
+
+#endif
 
 /* Mbed build tool passes just APPLICATION_xxx macros to C/C++ files and just
  * MBED_APP_xxx macros to linker files even though they mean the same thing.
@@ -127,5 +215,55 @@
 #if (APPLICATION_RAM_SIZE != MBED_RAM_APP_SIZE)
 #error("APPLICATION_RAM_SIZE and MBED_RAM_APP_SIZE are not the same!!!")
 #endif
+
+/* Determine NSC area
+ *
+ * Requirements for NSC area:
+ * 1. Requested by SAU, NSC area must start at 32 byte-aligned boundary.
+ * 2. By IDAU, 0~0x4000 is secure. NSC can only locate in 0x4000~0x10000000.
+ * 3. Greentea flash IAP uses last 2 sectors for its test. Avoid this range.
+ * 4. Greentea NVSTORE uses last 2 sectors or 4 KiB x 2 for its test. Avoid this range.
+ * 5. KVStore uses last a few KiB. Avoid this range.
+ * 6. Due to TFM build process, TFM and its tests must generate the same cmse_lib.o.
+ *    To this end, TZ NSC location must fix at a well-known location and cannot place
+ *    arbitrarily.
+ *
+ * Configurable for NSC area:
+ * We cannot configure NSC location via configuration parameter because the generated
+ * configuration macros are just passed to C/C++ files but not to linker files. So
+ * we can only hardcode NSC location here as constants (to be included by linker file).
+ *
+ * Locate NSC area at end of secure flash:
+ * We decide to locate NSC area at end of secure flash. To avoid this area
+ * accidentally erased by flash IAP operation, flash IAP must configure to exclude
+ * this area.
+ */
+/* TZ NSC area defaults to from secure ROM end */
+#define NU_TZ_NSC_START     (NU_ROM_START_S + NU_ROM_SIZE_S - NU_TZ_NSC_SIZE)
+/* TZ NSC area defaults to 4KiB. */
+#define NU_TZ_NSC_SIZE      0x1000
+
+/* Configuration of TDB internal storage area
+ *
+ * 1. Must match "tdb_internal/mbed_lib.json"
+ * 2. Can pass to linker files for memory layout check
+ *
+ * With this approach, we can pass this configuration from "tdb_internal/mbed_lib.json"
+ * to linker file for detecting memory layout error before run-time.
+ */
+#if !defined(DOMAIN_NS) || (DOMAIN_NS == 0)
+#if (TFM_LVL > 0)
+/* TDB internal storage area defaults to 32KiB at end of flash. */
+#define NU_TDB_INTERNAL_STORAGE_START   (NU_ROM_START_S + NU_ROM_SIZE_S - NU_TZ_NSC_SIZE - NU_TDB_INTERNAL_STORAGE_SIZE)
+#define NU_TDB_INTERNAL_STORAGE_SIZE    0x8000
+#endif
+#endif
+
+/* Configuration of flash IAP area */
+#define NU_FLASHIAP_SECURE_START        NU_ROM_START_S
+/* Exclude NSC area to avoid accidentally erased */
+#define NU_FLASHIAP_SECURE_SIZE         (NU_ROM_SIZE_S - NU_TZ_NSC_SIZE)
+#define NU_FLASHIAP_NONSECURE_START     NU_ROM_START_NS
+#define NU_FLASHIAP_NONSECURE_SIZE      NU_ROM_SIZE_NS
 
 #endif  /* __PARTITION_M2354_MEM_H__ */

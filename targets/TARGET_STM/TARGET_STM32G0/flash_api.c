@@ -17,50 +17,12 @@
  */
 
 #include "flash_api.h"
-#include "platform/mbed_critical.h"
+#include "mbed_critical.h"
 
 #if DEVICE_FLASH
 #include "mbed_assert.h"
 #include "cmsis.h"
 
-
-uint32_t GetBank(uint32_t Addr)
-{
-#if defined(FLASH_DBANK_SUPPORT)
-    if (Addr < (FLASH_BASE + FLASH_BANK_SIZE))
-    {
-        return FLASH_BANK_1;
-    }
-    else
-    {
-        return FLASH_BANK_2;
-    }
-#else
-    return FLASH_BANK_1;
-#endif
-}
-
-uint32_t GetPage(uint32_t Addr)
-{
-    uint32_t page = 0;
-
-#if defined(FLASH_DBANK_SUPPORT)
-    if (Addr < (FLASH_BASE + FLASH_BANK_SIZE))
-    {
-        /* Bank 1 */
-        page = (Addr - FLASH_BASE) / FLASH_PAGE_SIZE;
-    }
-    else
-    {
-        /* Bank 2 */
-        page = (Addr - (FLASH_BASE + FLASH_BANK_SIZE)) / FLASH_PAGE_SIZE;
-    }
-#else
-    page = (Addr - FLASH_BASE) / FLASH_PAGE_SIZE;
-#endif
-
-    return page;
-}
 
 int32_t flash_init(flash_t *obj)
 {
@@ -70,6 +32,27 @@ int32_t flash_init(flash_t *obj)
 int32_t flash_free(flash_t *obj)
 {
     return 0;
+}
+
+static int32_t flash_unlock(void)
+{
+    /* Allow Access to Flash control registers and user Falsh */
+    if (HAL_FLASH_Unlock()) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+static int32_t flash_lock(void)
+{
+    /* Disable the Flash option control register access (recommended to protect
+    the option Bytes against possible unwanted operations) */
+    if (HAL_FLASH_Lock()) {
+        return -1;
+    } else {
+        return 0;
+    }
 }
 
 int32_t flash_erase_sector(flash_t *obj, uint32_t address)
@@ -83,11 +66,9 @@ int32_t flash_erase_sector(flash_t *obj, uint32_t address)
         return -1;
     }
 
-    if (HAL_FLASH_Unlock() != HAL_OK) {
+    if (flash_unlock() != HAL_OK) {
         return -1;
     }
-
-    core_util_critical_section_enter();
 
     /* Clear OPTVERR bit set on virgin samples */
     __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_OPTVERR);
@@ -95,8 +76,7 @@ int32_t flash_erase_sector(flash_t *obj, uint32_t address)
     /* MBED HAL erases 1 sector at a time */
     /* Fill EraseInit structure*/
     EraseInitStruct.TypeErase   = FLASH_TYPEERASE_PAGES;
-    EraseInitStruct.Banks       = GetBank(address);
-    EraseInitStruct.Page        = GetPage(address);
+    EraseInitStruct.Page        = (address & 0xFFFFF) / 2048; // page size = 2048
     EraseInitStruct.NbPages     = 1;
 
     /* Note: If an erase operation in Flash memory also concerns data in the data or instruction cache,
@@ -108,11 +88,7 @@ int32_t flash_erase_sector(flash_t *obj, uint32_t address)
         status = -1;
     }
 
-    core_util_critical_section_exit();
-
-    if (HAL_FLASH_Lock() != HAL_OK) {
-        return -1;
-    }
+    flash_lock();
 
     return status;
 
@@ -133,7 +109,7 @@ int32_t flash_program_page(flash_t *obj, uint32_t address,
         return -1;
     }
 
-    if (HAL_FLASH_Unlock() != HAL_OK) {
+    if (flash_unlock() != HAL_OK) {
         return -1;
     }
 
@@ -167,9 +143,7 @@ int32_t flash_program_page(flash_t *obj, uint32_t address,
         }
     }
 
-    if (HAL_FLASH_Lock() != HAL_OK) {
-        return -1;
-    }
+    flash_lock();
 
     return status;
 }

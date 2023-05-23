@@ -168,6 +168,7 @@ void SYS_ResetCPU(void)
   * @details    This function reset selected module.
   */
 #if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
+__NONSECURE_ENTRY
 void SYS_ResetModule(uint32_t u32ModuleIndex)
 {
     uint32_t u32TmpVal = 0UL, u32TmpAddr = 0UL;

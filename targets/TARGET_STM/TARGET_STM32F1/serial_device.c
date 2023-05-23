@@ -32,11 +32,7 @@
 
 #include "serial_api_hal.h"
 
-#if defined(TARGET_STM32F103xG)
-#define UART_NUM (5)
-#else
 #define UART_NUM (3)
-#endif
 
 uint32_t serial_irq_ids[UART_NUM] = {0};
 UART_HandleTypeDef uart_handlers[UART_NUM];
@@ -98,20 +94,6 @@ static void uart3_irq(void)
 }
 #endif
 
-#if defined(USART4_BASE)
-static void uart4_irq(void)
-{
-    uart_irq(UART_4);
-}
-#endif
-
-#if defined(USART5_BASE)
-static void uart5_irq(void)
-{
-    uart_irq(UART_5);
-}
-#endif
-
 void serial_irq_handler(serial_t *obj, uart_irq_handler handler, uint32_t id)
 {
     struct serial_s *obj_s = SERIAL_S(obj);
@@ -145,20 +127,6 @@ void serial_irq_set(serial_t *obj, SerialIrq irq, uint32_t enable)
     if (obj_s->uart == UART_3) {
         irq_n = USART3_IRQn;
         vector = (uint32_t)&uart3_irq;
-    }
-#endif
-
-#if defined(USART4_BASE)
-    if (obj_s->uart == UART_4) {
-        irq_n = USART4_IRQn;
-        vector = (uint32_t)&uart4_irq;
-    }
-#endif
-
-#if defined(USART5_BASE)
-    if (obj_s->uart == UART_5) {
-        irq_n = USART5_IRQn;
-        vector = (uint32_t)&uart5_irq;
     }
 #endif
 
@@ -333,16 +301,6 @@ static IRQn_Type serial_get_irq_n(UARTName uart_name)
 #if defined(USART3_BASE)
         case UART_3:
             irq_n = USART3_IRQn;
-            break;
-#endif
-#if defined(USART4_BASE)
-        case UART_4:
-            irq_n = USART4_IRQn;
-            break;
-#endif
-#if defined(USART5_BASE)
-        case UART_5:
-            irq_n = USART5_IRQn;
             break;
 #endif
         default:

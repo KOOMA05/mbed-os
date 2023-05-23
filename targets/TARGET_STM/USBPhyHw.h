@@ -1,6 +1,5 @@
 /* mbed Microcontroller Library
  * Copyright (c) 2018-2019 ARM Limited
- * SPDX-License-Identifier: Apache-2.0
  * Copyright (c) 2018-2019 STMicroelectronics
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,13 +18,7 @@
 #ifndef USBPHYHW_H
 #define USBPHYHW_H
 
-#include <string.h>
-
-#include "platform/mbed_toolchain.h"
-#include "platform/mbed_error.h"
-#include "platform/mbed_assert.h"
-#include "platform/mbed_wait_api.h"
-#include "platform/mbed_power_mgmt.h"
+#include "mbed.h"
 #include "USBPhy.h"
 #include "PeripheralPins.h"
 
@@ -43,12 +36,8 @@
 
 #if MBED_CONF_TARGET_USB_SPEED == USE_USB_NO_OTG
 
-#if defined(TARGET_STM32F1) || defined(TARGET_STM32L1) || defined(TARGET_STM32WB) || defined(TARGET_STM32G4)
-#define USBHAL_IRQn  USB_LP_IRQn
-#elif defined(TARGET_STM32F3)
-#define USBHAL_IRQn  USB_LP_CAN_RX0_IRQn
-#elif defined(TARGET_STM32L5)
-#define USBHAL_IRQn  USB_FS_IRQn
+#if defined(TARGET_STM32F3) || defined(TARGET_STM32WB)
+#define USBHAL_IRQn  USB_HP_IRQn
 #else
 #define USBHAL_IRQn  USB_IRQn
 #endif
@@ -61,7 +50,7 @@
 
 #endif
 
-#define NB_ENDPOINT  8
+#define NB_ENDPOINT  16
 
 // #define MAXTRANSFER_SIZE  0x200
 #define MAX_PACKET_SIZE_SETUP (48)

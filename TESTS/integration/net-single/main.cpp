@@ -23,8 +23,6 @@
 
 #if !INTEGRATION_TESTS
 #error [NOT_SUPPORTED] integration tests not enabled for this target
-#elif !MBED_CONF_RTOS_PRESENT
-#error [NOT_SUPPORTED] integration tests require RTOS
 #else
 
 #include "mbed.h"
@@ -49,22 +47,24 @@ using namespace utest::v1;
 
 #if !defined(MBED_CONF_APP_NO_LED)
 DigitalOut led1(LED1);
+DigitalOut led2(LED2);
 void led_thread()
 {
     led1 = !led1;
+    led2 = !led1;
 }
 #endif
 
 #define MAX_RETRIES 3
-NetworkInterface *netif = NULL;
+NetworkInterface *interface = NULL;
 static control_t setup_network(const size_t call_count)
 {
-    netif = NetworkInterface::get_default_instance();
-    TEST_ASSERT_NOT_NULL_MESSAGE(netif, "failed to initialize network");
+    interface = NetworkInterface::get_default_instance();
+    TEST_ASSERT_NOT_NULL_MESSAGE(interface, "failed to initialize network");
 
     nsapi_error_t err = -1;
     for (int tries = 0; tries < MAX_RETRIES; tries++) {
-        err = netif->connect();
+        err = interface->connect();
         if (err == NSAPI_ERROR_OK) {
             break;
         } else {
@@ -72,40 +72,41 @@ static control_t setup_network(const size_t call_count)
         }
     }
     TEST_ASSERT_EQUAL(NSAPI_ERROR_OK, err);
-
+    tr_info("[NET] IP address is '%s'", interface->get_ip_address());
+    tr_info("[NET] MAC address is '%s'", interface->get_mac_address());
     return CaseNext;
 }
 
 static control_t download_128(const size_t call_count)
 {
-    download_test(netif, story, sizeof(story), 128);
+    download_test(interface, story, sizeof(story), 128);
 
     return CaseNext;
 }
 static control_t download_256(const size_t call_count)
 {
-    download_test(netif, story, sizeof(story), 256);
+    download_test(interface, story, sizeof(story), 256);
 
     return CaseNext;
 }
 
 static control_t download_1k(const size_t call_count)
 {
-    download_test(netif, story, sizeof(story), 1024);
+    download_test(interface, story, sizeof(story), 1024);
 
     return CaseNext;
 }
 
 static control_t download_2k(const size_t call_count)
 {
-    download_test(netif, story, sizeof(story), 2 * 1024);
+    download_test(interface, story, sizeof(story), 2 * 1024);
 
     return CaseNext;
 }
 
 static control_t download_4k(const size_t call_count)
 {
-    download_test(netif, story, sizeof(story), 4 * 1024);
+    download_test(interface, story, sizeof(story), 4 * 1024);
 
     return CaseNext;
 }

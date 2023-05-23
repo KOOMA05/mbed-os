@@ -25,7 +25,6 @@
 #include "pinmap.h"
 #include "PeripheralPins.h"
 #include "nu_bitutil.h"
-#include "mbed_assert.h"
 
 #define NU_MAX_PIN_PER_PORT     16
 
@@ -75,7 +74,7 @@ static PinName gpio_irq_debounce_arr[] = {
 #define MBED_CONF_TARGET_GPIO_IRQ_DEBOUNCE_SAMPLE_RATE GPIO_DBCTL_DBCLKSEL_16
 #endif
 
-int gpio_irq_init(gpio_irq_t *obj, PinName pin, gpio_irq_handler handler, uintptr_t context)
+int gpio_irq_init(gpio_irq_t *obj, PinName pin, gpio_irq_handler handler, uint32_t id)
 {
     if (pin == NC) {
         return -1;
@@ -88,9 +87,8 @@ int gpio_irq_init(gpio_irq_t *obj, PinName pin, gpio_irq_handler handler, uintpt
     }
 
     obj->pin = pin;
-    obj->irq_types = 0;
     obj->irq_handler = (uint32_t) handler;
-    obj->irq_id = context;
+    obj->irq_id = id;
 
     GPIO_T *gpio_base = NU_PORT_BASE(port_index);
     // NOTE: In InterruptIn constructor, gpio_irq_init() is called with gpio_init_in() which is responsible for multi-function pin setting.
@@ -156,38 +154,27 @@ void gpio_irq_set(gpio_irq_t *obj, gpio_irq_event event, uint32_t enable)
     uint32_t port_index = NU_PINPORT(obj->pin);
     GPIO_T *gpio_base = NU_PORT_BASE(port_index);
 
-    /* We assume BSP has such coding so that we can easily add/remove either irq type. */
-    static_assert(GPIO_INT_BOTH_EDGE == (GPIO_INT_RISING | GPIO_INT_FALLING),
-        "GPIO_INT_BOTH_EDGE must be bitwise OR of GPIO_INT_RISING and GPIO_INT_FALLING");
-    uint32_t irq_type;
     switch (event) {
-        case IRQ_RISE:
-            irq_type = GPIO_INT_RISING;
-            break;
+    case IRQ_RISE:
+        if (enable) {
+            GPIO_EnableInt(gpio_base, pin_index, GPIO_INT_RISING);
+        } else {
+            gpio_base->INTEN &= ~(GPIO_INT_RISING << pin_index);
+        }
+        break;
 
-        case IRQ_FALL:
-            irq_type = GPIO_INT_FALLING;
-            break;
+    case IRQ_FALL:
+        if (enable) {
+            GPIO_EnableInt(gpio_base, pin_index, GPIO_INT_FALLING);
+        } else {
+            gpio_base->INTEN &= ~(GPIO_INT_FALLING << pin_index);
+        }
+        break;
 
-        default:
-            irq_type = 0;
+    case IRQ_NONE:
+    default:
+        break;
     }
-
-    /* We can handle invalid/null irq type. */
-    if (enable) {
-        obj->irq_types |= irq_type;
-    } else {
-        obj->irq_types &= ~irq_type;
-    }
-
-    /* Update irq types:
-     *
-     * Implementations of GPIO_EnableInt(...) are inconsistent: disable or not irq type not enabled.
-     * For consistency, disable GPIO_INT_BOTH_EDGE and then enable OR'ed irq types, GPIO_INT_RISING,
-     * GPIO_INT_FALLING, or both.
-     */
-    GPIO_DisableInt(gpio_base, pin_index);
-    GPIO_EnableInt(gpio_base, pin_index, obj->irq_types);
 }
 
 void gpio_irq_enable(gpio_irq_t *obj)

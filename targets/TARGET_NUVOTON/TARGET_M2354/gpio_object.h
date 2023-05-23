@@ -24,6 +24,7 @@
 #include "PortNames.h"
 #include "PeripheralNames.h"
 #include "PinNames.h"
+#include "partition_M2354.h"
 
 #ifdef __cplusplus
 extern "C" {

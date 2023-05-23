@@ -37,7 +37,6 @@
 #include "pinmap.h"
 #include "mbed_error.h"
 #include "gpio_irq_device.h"
-#include "platform/mbed_critical.h"
 
 #define EDGE_NONE (0)
 #define EDGE_RISE (1)
@@ -47,13 +46,12 @@
 
 typedef struct gpio_channel {
     uint32_t pin_mask;                   // bitmask representing which pins are configured for receiving interrupts
-    uintptr_t channel_contexts[MAX_PIN_LINE];  // mbed "gpio_irq_t gpio_irq" field of instance
+    uint32_t channel_ids[MAX_PIN_LINE];  // mbed "gpio_irq_t gpio_irq" field of instance
     GPIO_TypeDef *channel_gpio[MAX_PIN_LINE]; // base address of gpio port group
     uint32_t channel_pin[MAX_PIN_LINE];  // pin number in port group
 } gpio_channel_t;
 
 static gpio_irq_handler irq_handler;
-static uint16_t irq_channel_used = 0x00;
 
 static gpio_channel_t channels[CHANNEL_NUM] = {
 #ifdef EXTI_IRQ0_NUM_LINES
@@ -124,12 +122,12 @@ static void handle_interrupt_in(uint32_t irq_index, uint32_t max_num_pin_line)
             if (LL_EXTI_IsActiveRisingFlag_0_31(pin) != RESET) {
                 LL_EXTI_ClearRisingFlag_0_31(pin);
 
-                if (gpio_channel->channel_contexts[gpio_idx] == 0) {
+                if (gpio_channel->channel_ids[gpio_idx] == 0) {
                     continue;
                 }
 
                 gpio_irq_event event = IRQ_RISE;
-                irq_handler(gpio_channel->channel_contexts[gpio_idx], event);
+                irq_handler(gpio_channel->channel_ids[gpio_idx], event);
 
                 return;
             }
@@ -137,12 +135,12 @@ static void handle_interrupt_in(uint32_t irq_index, uint32_t max_num_pin_line)
             if (LL_EXTI_IsActiveFallingFlag_0_31(pin) != RESET) {
                 LL_EXTI_ClearFallingFlag_0_31(pin);
 
-                if (gpio_channel->channel_contexts[gpio_idx] == 0) {
+                if (gpio_channel->channel_ids[gpio_idx] == 0) {
                     continue;
                 }
 
                 gpio_irq_event event = IRQ_FALL;
-                irq_handler(gpio_channel->channel_contexts[gpio_idx], event);
+                irq_handler(gpio_channel->channel_ids[gpio_idx], event);
 
                 return;
             }
@@ -150,14 +148,10 @@ static void handle_interrupt_in(uint32_t irq_index, uint32_t max_num_pin_line)
 #else /* TARGET_STM32L5 */
 
             // Clear interrupt flag
-#if defined(DUAL_CORE) && defined(CORE_CM4) && defined(TARGET_STM32H7)
-            if (__HAL_GPIO_EXTID2_GET_FLAG(pin) != RESET) {
-                __HAL_GPIO_EXTID2_CLEAR_FLAG(pin);
-#else
             if (__HAL_GPIO_EXTI_GET_FLAG(pin) != RESET) {
                 __HAL_GPIO_EXTI_CLEAR_FLAG(pin);
-#endif
-                if (gpio_channel->channel_contexts[gpio_idx] == 0) {
+
+                if (gpio_channel->channel_ids[gpio_idx] == 0) {
                     continue;
                 }
 
@@ -183,7 +177,7 @@ static void handle_interrupt_in(uint32_t irq_index, uint32_t max_num_pin_line)
                     }
                 }
 
-                irq_handler(gpio_channel->channel_contexts[gpio_idx], event);
+                irq_handler(gpio_channel->channel_ids[gpio_idx], event);
 
                 return;
             }
@@ -310,7 +304,7 @@ static void gpio_irq15(void)
 extern GPIO_TypeDef *Set_GPIO_Clock(uint32_t port_idx);
 extern void pin_function_gpiomode(PinName pin, uint32_t gpiomode);
 
-int gpio_irq_init(gpio_irq_t *obj, PinName pin, gpio_irq_handler handler, uintptr_t context)
+int gpio_irq_init(gpio_irq_t *obj, PinName pin, gpio_irq_handler handler, uint32_t id)
 {
     uint32_t vector = 0;
     uint32_t irq_index;
@@ -321,24 +315,14 @@ int gpio_irq_init(gpio_irq_t *obj, PinName pin, gpio_irq_handler handler, uintpt
         return -1;
     }
 
-    core_util_critical_section_enter();
-
     /* Enable SYSCFG Clock */
-#if (!defined(TARGET_STM32WB) && !defined(TARGET_STM32WL))
+#if !defined(TARGET_STM32WB)
     __HAL_RCC_SYSCFG_CLK_ENABLE();
 #endif
 
     uint32_t port_index  = STM_PORT(pin);
     uint32_t pin_index  = STM_PIN(pin);
     irq_index =  pin_lines_desc[pin_index].irq_index;
-
-    if (irq_channel_used & (1<<pin_index)) {
-        error("InterruptIn error: irq channel conflict\n");
-        return -1;
-    }
-    else {
-        irq_channel_used |= (1<<pin_index);
-    }
 
     switch (irq_index) {
 #ifdef EXTI_IRQ0_NUM_LINES
@@ -438,7 +422,7 @@ int gpio_irq_init(gpio_irq_t *obj, PinName pin, gpio_irq_handler handler, uintpt
     gpio_channel = &channels[irq_index];
     gpio_idx = pin_lines_desc[pin_index].gpio_idx;
     gpio_channel->pin_mask |= (1 << gpio_idx);
-    gpio_channel->channel_contexts[gpio_idx] = context;
+    gpio_channel->channel_ids[gpio_idx] = id;
     gpio_channel->channel_gpio[gpio_idx] = gpio_add;
     gpio_channel->channel_pin[gpio_idx] = pin_index;
 
@@ -448,27 +432,19 @@ int gpio_irq_init(gpio_irq_t *obj, PinName pin, gpio_irq_handler handler, uintpt
     NVIC_SetVector(obj->irq_n, vector);
     gpio_irq_enable(obj);
 
-    core_util_critical_section_exit();
     return 0;
 }
 
 void gpio_irq_free(gpio_irq_t *obj)
 {
-    core_util_critical_section_enter();
-
     uint32_t gpio_idx = pin_lines_desc[STM_PIN(obj->pin)].gpio_idx;
     gpio_channel_t *gpio_channel = &channels[obj->irq_index];
 
-    gpio_irq_disable(obj);
-
     gpio_channel->pin_mask &= ~(1 << gpio_idx);
-    gpio_channel->channel_contexts[gpio_idx] = 0;
+    gpio_channel->channel_ids[gpio_idx] = 0;
     gpio_channel->channel_gpio[gpio_idx] = 0;
     gpio_channel->channel_pin[gpio_idx] = 0;
-
-    irq_channel_used &= ~(1<<(STM_PIN(obj->pin)));
-
-    core_util_critical_section_exit();
+    gpio_irq_disable(obj);
 }
 
 void gpio_irq_set(gpio_irq_t *obj, gpio_irq_event event, uint32_t enable)
@@ -502,7 +478,7 @@ void gpio_irq_enable(gpio_irq_t *obj)
 
     /*  Select Source  */
 
-#if defined(STM32G0) || defined(STM32L5) || defined(STM32U5)
+#if defined(STM32G0) || defined(STM32L5)
     temp = EXTI->EXTICR[pin_index >> 2];
     CLEAR_BIT(temp, (0x0FU) << (8U * (pin_index & 0x03U)));
     SET_BIT(temp, port_index << (8U * (pin_index & 0x03U)));
@@ -514,11 +490,7 @@ void gpio_irq_enable(gpio_irq_t *obj)
     SYSCFG->EXTICR[pin_index >> 2] = temp;
 #endif
 
-#if defined(DUAL_CORE) && defined(CORE_CM4) && defined(TARGET_STM32H7)
-    LL_C2_EXTI_EnableIT_0_31(1 << pin_index);
-#else
     LL_EXTI_EnableIT_0_31(1 << pin_index);
-#endif
 
     /* Restore previous edge interrupt configuration if applicable */
     if (obj->event & IRQ_RISE) {
@@ -542,19 +514,7 @@ void gpio_irq_disable(gpio_irq_t *obj)
     /* Clear EXTI line configuration */
     LL_EXTI_DisableRisingTrig_0_31(1 << pin_index);
     LL_EXTI_DisableFallingTrig_0_31(1 << pin_index);
-
-#if defined(DUAL_CORE) && defined(CORE_CM4) && defined(TARGET_STM32H7)
-    LL_C2_EXTI_DisableIT_0_31(1 << pin_index);
-#else
     LL_EXTI_DisableIT_0_31(1 << pin_index);
-#endif
-
-    uint32_t pin = (uint32_t)(1 << (gpio_channel->channel_pin[gpio_idx]));
-
-    // Clear interrupt flag
-    if (__HAL_GPIO_EXTI_GET_FLAG(pin) != RESET) {
-        __HAL_GPIO_EXTI_CLEAR_FLAG(pin);
-    }
 
     const bool no_more_pins_on_vector = (gpio_channel->pin_mask & ~pin_mask) == 0;
     if (no_more_pins_on_vector) {

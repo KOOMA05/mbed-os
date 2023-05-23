@@ -1,7 +1,5 @@
-/*
- * Copyright (c) 2015-2016, Nuvoton Technology Corporation
- *
- * SPDX-License-Identifier: Apache-2.0
+/* mbed Microcontroller Library
+ * Copyright (c) 2015-2016 Nuvoton
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,61 +21,28 @@
 #include "cmsis.h"
 #include "pinmap.h"
 #include "PeripheralPins.h"
-#include "gpio_api.h"
 #include "nu_modutil.h"
-#include "hal/PinNameAliases.h"
 
 static uint32_t eadc_modinit_mask = 0;
 
 static const struct nu_modinit_s adc_modinit_tab[] = {
-    /* EADC0 */
-    {ADC_0_0, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, EADC00_IRQn, NULL},
-    {ADC_0_1, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, EADC00_IRQn, NULL},
-    {ADC_0_2, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, EADC00_IRQn, NULL},
-    {ADC_0_3, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, EADC00_IRQn, NULL},
-    {ADC_0_4, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, EADC00_IRQn, NULL},
-    {ADC_0_5, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, EADC00_IRQn, NULL},
-    {ADC_0_6, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, EADC00_IRQn, NULL},
-    {ADC_0_7, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, EADC00_IRQn, NULL},
-    {ADC_0_8, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, EADC00_IRQn, NULL},
-    {ADC_0_9, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, EADC00_IRQn, NULL},
-    {ADC_0_10, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, EADC00_IRQn, NULL},
-    {ADC_0_11, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, EADC00_IRQn, NULL},
-    {ADC_0_12, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, EADC00_IRQn, NULL},
-    {ADC_0_13, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, EADC00_IRQn, NULL},
-    {ADC_0_14, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, EADC00_IRQn, NULL},
-    {ADC_0_15, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, EADC00_IRQn, NULL},
-
-    /* EADC1 */
-    {ADC_1_0, EADC1_MODULE, 0, CLK_CLKDIV2_EADC1(8), EADC1_RST, EADC10_IRQn, NULL},
-    {ADC_1_1, EADC1_MODULE, 0, CLK_CLKDIV2_EADC1(8), EADC1_RST, EADC10_IRQn, NULL},
-    {ADC_1_2, EADC1_MODULE, 0, CLK_CLKDIV2_EADC1(8), EADC1_RST, EADC10_IRQn, NULL},
-    {ADC_1_3, EADC1_MODULE, 0, CLK_CLKDIV2_EADC1(8), EADC1_RST, EADC10_IRQn, NULL},
-    {ADC_1_4, EADC1_MODULE, 0, CLK_CLKDIV2_EADC1(8), EADC1_RST, EADC10_IRQn, NULL},
-    {ADC_1_5, EADC1_MODULE, 0, CLK_CLKDIV2_EADC1(8), EADC1_RST, EADC10_IRQn, NULL},
-    {ADC_1_6, EADC1_MODULE, 0, CLK_CLKDIV2_EADC1(8), EADC1_RST, EADC10_IRQn, NULL},
-    {ADC_1_7, EADC1_MODULE, 0, CLK_CLKDIV2_EADC1(8), EADC1_RST, EADC10_IRQn, NULL},
-    {ADC_1_8, EADC1_MODULE, 0, CLK_CLKDIV2_EADC1(8), EADC1_RST, EADC10_IRQn, NULL},
-    {ADC_1_9, EADC1_MODULE, 0, CLK_CLKDIV2_EADC1(8), EADC1_RST, EADC10_IRQn, NULL},
-    {ADC_1_10, EADC1_MODULE, 0, CLK_CLKDIV2_EADC1(8), EADC1_RST, EADC10_IRQn, NULL},
-    {ADC_1_11, EADC1_MODULE, 0, CLK_CLKDIV2_EADC1(8), EADC1_RST, EADC10_IRQn, NULL},
-    {ADC_1_12, EADC1_MODULE, 0, CLK_CLKDIV2_EADC1(8), EADC1_RST, EADC10_IRQn, NULL},
-    {ADC_1_13, EADC1_MODULE, 0, CLK_CLKDIV2_EADC1(8), EADC1_RST, EADC10_IRQn, NULL},
-    {ADC_1_14, EADC1_MODULE, 0, CLK_CLKDIV2_EADC1(8), EADC1_RST, EADC10_IRQn, NULL},
-    {ADC_1_15, EADC1_MODULE, 0, CLK_CLKDIV2_EADC1(8), EADC1_RST, EADC10_IRQn, NULL},
+    {ADC_0_0, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, ADC0_IRQn, NULL},
+    {ADC_0_1, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, ADC0_IRQn, NULL},
+    {ADC_0_2, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, ADC0_IRQn, NULL},
+    {ADC_0_3, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, ADC0_IRQn, NULL},
+    {ADC_0_4, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, ADC0_IRQn, NULL},
+    {ADC_0_5, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, ADC0_IRQn, NULL},
+    {ADC_0_6, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, ADC0_IRQn, NULL},
+    {ADC_0_7, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, ADC0_IRQn, NULL},
+    {ADC_0_8, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, ADC0_IRQn, NULL},
+    {ADC_0_9, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, ADC0_IRQn, NULL},
+    {ADC_0_10, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, ADC0_IRQn, NULL},
+    {ADC_0_11, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, ADC0_IRQn, NULL},
+    {ADC_0_12, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, ADC0_IRQn, NULL},
+    {ADC_0_13, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, ADC0_IRQn, NULL},
+    {ADC_0_14, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, ADC0_IRQn, NULL},
+    {ADC_0_15, EADC_MODULE, 0, CLK_CLKDIV0_EADC(8), EADC_RST, ADC0_IRQn, NULL},
 };
-
-#if defined(MBED_CONF_TARGET_EADC_EXTSMPT_LIST)
-/* Structure for extending sampling time on per-pin basis */
-struct nu_eadc_extsmpt {
-    PinName     pin;
-    uint32_t    value;
-};
-
-static struct nu_eadc_extsmpt eadc_extsmpt_arr[] = {
-    MBED_CONF_TARGET_EADC_EXTSMPT_LIST
-};
-#endif
 
 void analogin_init(analogin_t *obj, PinName pin)
 {
@@ -114,18 +79,6 @@ void analogin_init(analogin_t *obj, PinName pin)
 
     // Configure the sample module Nmod for analog input channel Nch and software trigger source
     EADC_ConfigSampleModule(eadc_base, chn, EADC_SOFTWARE_TRIGGER, chn);
-
-#if defined(MBED_CONF_TARGET_EADC_EXTSMPT_LIST)
-    // Extend sampling time in EADC clocks on per-pin basis
-    struct nu_eadc_extsmpt *eadc_extsmpt_pos = eadc_extsmpt_arr;
-    struct nu_eadc_extsmpt *eadc_extsmpt_end = eadc_extsmpt_arr + sizeof (eadc_extsmpt_arr) / sizeof (eadc_extsmpt_arr[0]);
-    for (; eadc_extsmpt_pos != eadc_extsmpt_end; eadc_extsmpt_pos ++) {
-        if (eadc_extsmpt_pos->pin == pin) {
-            EADC_SetExtendSampleTime(eadc_base, chn, eadc_extsmpt_pos->value);
-            break;
-        }
-    }
-#endif
 
     eadc_modinit_mask |= 1 << chn;
 }

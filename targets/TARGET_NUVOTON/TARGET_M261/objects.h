@@ -30,7 +30,6 @@ extern "C" {
 
 struct gpio_irq_s {
     PinName     pin;
-    uint32_t    irq_types;
     uint32_t    irq_handler;
     uint32_t    irq_id;
     struct gpio_irq_s   *next;
@@ -128,13 +127,6 @@ struct sleep_s {
 
 struct trng_s {
     uint8_t dummy;
-};
-
-struct can_s {
-    CANName can;
-    PinName pin_rd;
-    PinName pin_td;
-    int index; 
 };
 
 #ifdef __cplusplus

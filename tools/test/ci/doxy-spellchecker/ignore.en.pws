@@ -88,7 +88,6 @@ emacs
 json
 noncopyable
 sendto
-gethostbyname
 multicast
 multicasts
 singleshot
@@ -112,14 +111,4 @@ pppdebug
 ppp
 api
 uart
-chrono
-Hinnant
-Vin
-Vref
-ssid
-instantiation
-instantiations
-KVStore
 _doxy_
-nothrow
-conf

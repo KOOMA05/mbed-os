@@ -1,7 +1,5 @@
-/*
- * Copyright (c) 2017-2018, Nuvoton Technology Corporation
- *
- * SPDX-License-Identifier: Apache-2.0
+/* mbed Microcontroller Library
+ * Copyright (c) 2017-2018 Nuvoton
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,12 +20,26 @@
 
 #include "cmsis.h"
 
+/* Define WDT clock source in target configuration option */
+#ifndef MBED_CONF_TARGET_WDT_CLKSRC_SEL
+#define MBED_CONF_TARGET_WDT_CLKSRC_SEL     LXT
+#endif
+
+/* WDT clock source definition */
+#define NU_INTERN_WDT_CLKSRC_LXT            1
+#define NU_INTERN_WDT_CLKSRC_LIRC           2
+
+/* WDT clock source selection */
+#define NU_INTERN_WDT_CLKSRC_SEL__(SEL)     NU_INTERN_WDT_CLKSRC_##SEL
+#define NU_INTERN_WDT_CLKSRC_SEL_(SEL)      NU_INTERN_WDT_CLKSRC_SEL__(SEL)
+#define NU_INTERN_WDT_CLKSRC_SEL            NU_INTERN_WDT_CLKSRC_SEL_(MBED_CONF_TARGET_WDT_CLKSRC_SEL)
+
 /* Watchdog clock per second */
-#if MBED_CONF_TARGET_LXT_PRESENT
+#if NU_INTERN_WDT_CLKSRC_SEL == NU_INTERN_WDT_CLKSRC_LXT
 #define NU_WDTCLK_PER_SEC           (__LXT)
 #define NU_WDTCLK_PER_SEC_MAX       (__LXT)
 #define NU_WDTCLK_PER_SEC_MIN       (__LXT)
-#else
+#elif NU_INTERN_WDT_CLKSRC_SEL == NU_INTERN_WDT_CLKSRC_LIRC
 #define NU_WDTCLK_PER_SEC           (__LIRC)
 #define NU_WDTCLK_PER_SEC_MAX       ((uint32_t) ((__LIRC) * 2.0f))
 #define NU_WDTCLK_PER_SEC_MIN       ((uint32_t) ((__LIRC) * 0.5f))
@@ -92,9 +104,9 @@ watchdog_status_t hal_watchdog_init(const watchdog_config_t *config)
         CLK_EnableModuleClock(WDT_MODULE);
 
         /* Select IP clock source */
-#if MBED_CONF_TARGET_LXT_PRESENT
+#if NU_INTERN_WDT_CLKSRC_SEL == NU_INTERN_WDT_CLKSRC_LXT
         CLK_SetModuleClock(WDT_MODULE, CLK_CLKSEL1_WDTSEL_LXT, 0);
-#else
+#elif NU_INTERN_WDT_CLKSRC_SEL == NU_INTERN_WDT_CLKSRC_LIRC
         CLK_SetModuleClock(WDT_MODULE, CLK_CLKSEL1_WDTSEL_LIRC, 0);
 #endif
 

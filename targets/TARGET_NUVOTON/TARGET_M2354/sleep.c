@@ -32,14 +32,9 @@
  *
  * These APIs are secure calls. For performance, merge them into one when
  * nu_idle_s() and nu_powerdown_s() are available.
- *
- * NOTE: MBED_WEAK gets unnecessary because nu_idle_s/nu_powerdown_s are always available
- *       since Mbed OS 6.
- * NOTE: With ARMCLANG, MBED_WEAK doesn't cause nu_idle_s/nu_powerdown_s to link in even though
- *       they are strong symbols. Add MBED_USED to ensure they are linked in.
  */
-void nu_idle_s(void);
-void nu_powerdown_s(void);
+MBED_WEAK void nu_idle_s(void);
+MBED_WEAK void nu_powerdown_s(void);
 
 #if DEVICE_SERIAL
 bool serial_can_deep_sleep(void);
@@ -50,7 +45,19 @@ bool serial_can_deep_sleep(void);
  */
 void hal_sleep(void)
 {
-    nu_idle_s();
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
+    SYS_UnlockReg();
+    CLK_Idle();
+    SYS_LockReg();
+#else
+    if (nu_idle_s) {
+        nu_idle_s();
+    } else {
+        SYS_UnlockReg_S();
+        CLK_Idle_S();
+        SYS_LockReg_S();
+    }
+#endif
 }
 
 /**
@@ -64,7 +71,19 @@ void hal_deepsleep(void)
     }
 #endif
 
-    nu_powerdown_s();
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
+    SYS_UnlockReg();
+    CLK_PowerDown();
+    SYS_LockReg();
+#else
+    if (nu_powerdown_s) {
+        nu_powerdown_s();
+    } else {
+        SYS_UnlockReg_S();
+        CLK_PowerDown_S();
+        SYS_LockReg_S();
+    }
+#endif
 }
 
 #endif

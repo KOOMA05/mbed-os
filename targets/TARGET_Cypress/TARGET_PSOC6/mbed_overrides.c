@@ -20,11 +20,8 @@
 #include "cycfg.h"
 #include "cyhal_hwmgr.h"
 #include "cybsp.h"
-#include "cy_mbed_post_init.h"
-#include "mbed_error.h"
-#if MBED_CONF_RTOS_PRESENT
+#include "mbed_power_mgmt.h"
 #include "rtos_idle.h"
-#endif // MBED_CONF_RTOS_PRESENT
 #include "us_ticker_api.h"
 
 #if defined(CY_ENABLE_XIP_PROGRAM)
@@ -34,10 +31,25 @@
 #include "cy_serial_flash_qspi.h"
 #endif /* defined(MBED_CONF_TARGET_XIP_ENABLE) */
 
-MBED_WEAK void cy_mbed_post_bsp_init_hook(void)
+#if defined(COMPONENT_SPM_MAILBOX)
+void mailbox_init(void);
+#endif
+
+
+#if (defined(CY_CFG_PWR_SYS_IDLE_MODE) && (CY_CFG_PWR_SYS_IDLE_MODE == CY_CFG_PWR_MODE_ACTIVE))
+/*******************************************************************************
+* Function Name: active_idle_hook
+****************************************************************************//**
+*
+* Empty idle hook function to prevent the system entering sleep mode
+* automatically any time the system is idle.
+*
+*******************************************************************************/
+static void active_idle_hook(void)
 {
-    /* By default, do nothing */
+    /* Do nothing, so the rtos_idle_loop() performs while(1) */
 }
+#endif
 
 /*******************************************************************************
 * Function Name: mbed_sdk_init
@@ -49,7 +61,7 @@ MBED_WEAK void cy_mbed_post_bsp_init_hook(void)
 *******************************************************************************/
 void mbed_sdk_init(void)
 {
-#if CY_CPU_CORTEX_M0P
+#if (CY_CPU_CORTEX_M0P && !defined(COMPONENT_SPM_MAILBOX))
     /* Disable global interrupts */
     __disable_irq();
 #endif
@@ -58,16 +70,18 @@ void mbed_sdk_init(void)
     /* Placed here as it must be done after proper LIBC initialization. */
     SystemInit();
 
+#if defined(COMPONENT_SPM_MAILBOX)
+    mailbox_init();
+#endif
+
     /* Set up the device based on configurator selections */
-    if (CY_RSLT_SUCCESS != cybsp_init()) {
-        MBED_ERROR(MBED_MAKE_ERROR(MBED_MODULE_DRIVER, MBED_ERROR_CODE_FAILED_OPERATION), "cybsp_init");
-    }
+    cybsp_init();
 
-    cy_mbed_post_bsp_init_hook();
-
-#if CY_CPU_CORTEX_M0P
+#if (CY_CPU_CORTEX_M0P)
+#if !defined(COMPONENT_SPM_MAILBOX)
     /* Enable global interrupts */
     __enable_irq();
+#endif
 #else
     /*
      * Init the us Ticker here to avoid imposing on the limited stack space of the idle thread.
@@ -84,5 +98,19 @@ void mbed_sdk_init(void)
 
     /* Enable global interrupts (disabled in CM4 startup assembly) */
     __enable_irq();
+#endif
+
+#if defined (CY_CFG_PWR_SYS_IDLE_MODE)
+    /* Configure the lowest power state the system is allowed to enter
+    * based on the System Idle Power Mode parameter value in the Device
+    * Configurator. The default value is system deep sleep.
+    */
+#if (CY_CFG_PWR_SYS_IDLE_MODE == CY_CFG_PWR_MODE_ACTIVE)
+    rtos_attach_idle_hook(&active_idle_hook);
+#elif (CY_CFG_PWR_SYS_IDLE_MODE == CY_CFG_PWR_MODE_SLEEP)
+    sleep_manager_lock_deep_sleep();
+#else
+    /* Deep sleep is default state */
+#endif
 #endif
 }

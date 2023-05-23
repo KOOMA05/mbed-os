@@ -1,7 +1,5 @@
-/*
- * Copyright (c) 2015-2016, Nuvoton Technology Corporation
- *
- * SPDX-License-Identifier: Apache-2.0
+/* mbed Microcontroller Library
+ * Copyright (c) 2015-2016 Nuvoton
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +21,6 @@
 #include "cmsis.h"
 #include "pinmap.h"
 #include "PeripheralPins.h"
-#include "gpio_api.h"
 #include "nu_modutil.h"
 #include "nu_miscutil.h"
 #include "nu_bitutil.h"
@@ -432,13 +429,13 @@ static int i2c_do_trsn(i2c_t *obj, uint32_t i2c_ctl, int sync)
         case 0x08:  // Start
         case 0x10:  // Master Repeat Start
             if (i2c_ctl & I2C_CTL0_STA_Msk) {
-                goto cleanup;
+                return 0;
             } else {
                 break;
             }
         case 0xF8:  // Bus Released
             if ((i2c_ctl & (I2C_CTL0_STA_Msk | I2C_CTL0_STO_Msk)) == I2C_CTL0_STO_Msk) {
-                goto cleanup;
+                return 0;
             } else {
                 break;
             }
@@ -448,8 +445,6 @@ static int i2c_do_trsn(i2c_t *obj, uint32_t i2c_ctl, int sync)
             err = I2C_ERROR_BUS_BUSY;
         }
     }
-
-cleanup:
 
     i2c_enable_int(obj);
 

@@ -28,5 +28,47 @@ void mbed_sdk_init(void)
     }
     inited = 1;
 
-    SystemCoreClockUpdate();		
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)    
+    /*---------------------------------------------------------------------------------------------------------*/
+    /* Init System Clock                                                                                       */
+    /*---------------------------------------------------------------------------------------------------------*/
+    /* Unlock protected registers */
+    SYS_UnlockReg();
+
+    /* Enable HIRC clock (Internal RC 12MHz) */
+    CLK_EnableXtalRC(CLK_PWRCTL_HIRCEN_Msk);
+    /* Enable HXT clock (external XTAL 12MHz) */
+    CLK_EnableXtalRC(CLK_PWRCTL_HXTEN_Msk);
+    /* Enable LIRC for lp_ticker */
+    CLK_EnableXtalRC(CLK_PWRCTL_LIRCEN_Msk);
+    /* Enable LXT for RTC */
+    CLK_EnableXtalRC(CLK_PWRCTL_LXTEN_Msk);
+    /* Enable HIRC48 clock (Internal RC 48MHz) */
+    CLK_EnableXtalRC(CLK_PWRCTL_HIRC48EN_Msk);
+
+    /* Wait for HIRC clock ready */
+    CLK_WaitClockReady(CLK_STATUS_HIRCSTB_Msk);
+    /* Wait for HXT clock ready */
+    CLK_WaitClockReady(CLK_STATUS_HXTSTB_Msk);
+    /* Wait for LIRC clock ready */
+    CLK_WaitClockReady(CLK_STATUS_LIRCSTB_Msk);
+    /* Wait for LXT clock ready */
+    CLK_WaitClockReady(CLK_STATUS_LXTSTB_Msk);
+    /* Wait for HIRC48 clock ready */
+    CLK_WaitClockReady(CLK_STATUS_HIRC48STB_Msk);
+
+    /* Skip SYS_SetPowerLevel(...) because it has addressed in CLK_SetCoreClock(...) > CLK_SetHCLK(...) */
+
+    /* Set core clock as 96M from PLL */
+    CLK_SetCoreClock(FREQ_96MHZ);
+    
+    /* Update System Core Clock */
+    /* User can use SystemCoreClockUpdate() to calculate SystemCoreClock. */
+    SystemCoreClockUpdate();
+
+    /* Lock protected registers */
+    SYS_LockReg();
+#else
+    SystemCoreClockUpdate();
+#endif		
 }

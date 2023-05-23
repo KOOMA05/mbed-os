@@ -3,7 +3,6 @@
  * @version  V3.00
  * @brief    Window Watchdog Timer(WWDT) driver source file
  *
- * @copyright SPDX-License-Identifier: Apache-2.0
  * @copyright (C) 2019-2020 Nuvoton Technology Corp. All rights reserved.
 *****************************************************************************/
 #include "NuMicro.h"
